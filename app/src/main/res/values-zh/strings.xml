@@ -1,0 +1,34 @@
+<resources>
+    <string name="app_name">猫娘输入法</string>
+    <string name="ime_name">猫娘输入法</string>
+    <string name="subtype_en_us">English (US)</string>
+    <string name="subtype_zh_cn">拼音</string>
+    <string name="enable_ime_title">1. 启用键盘</string>
+    <string name="enable_ime_desc">在系统设置中启用 猫娘输入法</string>
+    <string name="select_ime_title">2. 选择键盘</string>
+    <string name="select_ime_desc">将当前输入法切换为 猫娘输入法</string>
+    <string name="test_ime_title">3. 测试键盘</string>
+    <string name="test_ime_hint">点击此处测试键盘输入&#8230;</string>
+    <string name="space_english">English</string>
+    <string name="space_pinyin">拼音</string>
+
+    <string name="emoji_category_smileys">笑脸与人</string>
+    <string name="emoji_category_animals">动物与自然</string>
+    <string name="emoji_category_food">食物与饮料</string>
+    <string name="emoji_category_travel">旅行与地点</string>
+    <string name="emoji_category_activities">活动与物品</string>
+    <string name="emoji_category_symbols">符号与旗帜</string>
+    <string name="emoji_title">表情</string>
+
+    <string name="text_edit_title">文本编辑</string>
+    <string name="text_edit_select_all">全选</string>
+    <string name="text_edit_copy">复制</string>
+    <string name="text_edit_paste">粘贴</string>
+    <string name="text_edit_delete">删除</string>
+    <string name="text_edit_select">选择</string>
+    <string name="text_edit_cancel">取消</string>
+    <string name="text_edit_home">开头</string>
+    <string name="text_edit_end">结尾</string>
+    <string name="text_edit_collapse">收起</string>
+    <string name="menu_title">菜单</string>
+</resources>

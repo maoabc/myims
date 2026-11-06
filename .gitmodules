@@ -1,0 +1,3 @@
+[submodule "rime-android"]
+	path = rime-android
+	url = https://github.com/maoabc/librime-android.git
