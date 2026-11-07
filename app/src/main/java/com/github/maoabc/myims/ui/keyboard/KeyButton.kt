@@ -3,6 +3,7 @@ package com.github.maoabc.myims.ui.keyboard
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -32,13 +33,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
@@ -50,7 +51,10 @@ import com.github.maoabc.myims.ime.ShiftState
 import com.github.maoabc.myims.ui.theme.GboardTheme
 import com.github.maoabc.myims.ui.theme.LocalKeyboardColors
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.math.abs
+import kotlin.time.Duration.Companion.milliseconds
 
 @Composable
 fun KeyButton(
@@ -66,6 +70,7 @@ fun KeyButton(
     val haptic = LocalHapticFeedback.current
     val coroutineScope = rememberCoroutineScope()
     var isPressed by remember { mutableStateOf(false) }
+    var isSwipingUp by remember { mutableStateOf(false) }
 
     val displayText = remember(keyData, shiftState) {
         if (keyData.type == KeyType.CHARACTER && shiftState.isCapitalized()) {
@@ -112,10 +117,25 @@ fun KeyButton(
             .clip(RoundedCornerShape(8.dp))
             .background(animatedBgColor)
             .pointerInput(keyData, shiftState) {
-                detectTapGestures(
-                    onPress = {
+                val swipeThreshold = 20.dp.toPx()
+                awaitPointerEventScope {
+                    while (true) {
+                        val down = awaitFirstDown()
                         isPressed = true
-//                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        isSwipingUp = false
+                        var longPressTriggered = false
+
+                        val longPressJob = coroutineScope.launch {
+                            delay(400.milliseconds)
+                            if (!isSwipingUp) {
+                                longPressTriggered = true
+                                if (keyData.type != KeyType.BACKSPACE) {
+//                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    onKeyLongPress(keyData)
+                                }
+                            }
+                        }
+
                         var repeatJob: Job? = null
                         if (keyData.type == KeyType.BACKSPACE) {
                             repeatJob = coroutineScope.launchRepeatAction {
@@ -123,32 +143,80 @@ fun KeyButton(
                             }
                         }
 
+                        val pointerId = down.id
                         try {
-                            tryAwaitRelease()
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                val change = event.changes.find { it.id == pointerId } ?: break
+
+                                val dragX = change.position.x - down.position.x
+                                val dragY = change.position.y - down.position.y
+
+                                // Update swipe up state in real time while dragging
+                                if (!keyData.secondaryText.isNullOrEmpty() && keyData.type == KeyType.CHARACTER) {
+                                    isSwipingUp = dragY < -swipeThreshold && abs(dragY) > abs(dragX) * 1.2f
+                                }
+
+                                if (!change.pressed) {
+                                    break
+                                }
+
+                                // Cancel long press if moved too much horizontally or downwards
+                                if (abs(dragX) > 15.dp.toPx() || dragY > 15.dp.toPx()) {
+                                    longPressJob.cancel()
+                                }
+                            }
                         } finally {
+                            longPressJob.cancel()
                             repeatJob?.cancel()
                             isPressed = false
                         }
-                    },
-                    onTap = {
-                        if (keyData.type != KeyType.BACKSPACE) {
-                            onKeyClick(
-                                if (keyData.type == KeyType.CHARACTER && shiftState.isCapitalized()) {
-                                    keyData.copy(primaryText = keyData.primaryText.uppercase())
-                                } else keyData
-                            )
+
+                        if (!longPressTriggered) {
+                            if (keyData.type != KeyType.BACKSPACE) {
+                                if (isSwipingUp && !keyData.secondaryText.isNullOrEmpty()) {
+//                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    onKeyClick(keyData.copy(primaryText = keyData.secondaryText))
+                                } else {
+                                    onKeyClick(
+                                        if (keyData.type == KeyType.CHARACTER && shiftState.isCapitalized()) {
+                                            keyData.copy(primaryText = displayText)
+                                        } else keyData
+                                    )
+                                }
+                            }
                         }
-                    },
-                    onLongPress = {
-                        if (keyData.type != KeyType.BACKSPACE) {
-//                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            onKeyLongPress(keyData)
-                        }
+                        isSwipingUp = false
                     }
-                )
+                }
             },
         contentAlignment = Alignment.Center
     ) {
+        // Floating swipe-up preview bubble using Popup
+        if (isSwipingUp && !keyData.secondaryText.isNullOrEmpty()) {
+            Popup(
+                alignment = Alignment.TopCenter,
+                offset = IntOffset(0, -200),
+                properties = PopupProperties(focusable = false)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(52.dp, 60.dp)
+                        .shadow(8.dp, RoundedCornerShape(14.dp))
+                        .background(keyboardColors.keyPrimaryActionBackground, RoundedCornerShape(14.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = keyData.secondaryText,
+                        color = keyboardColors.keyPrimaryActionText,
+                        fontSize = 26.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        }
+
         // Main key content
         when (keyData.type) {
             KeyType.SHIFT -> {

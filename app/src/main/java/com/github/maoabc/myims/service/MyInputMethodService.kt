@@ -126,6 +126,9 @@ class MyInputMethodService : InputMethodService(),
                         simplified = options.simplified,
                         emoji = options.emoji
                     )
+                    rimeSessionInstance?.let { session ->
+                        KeyboardPreferencesManager.applyToSession(session, options)
+                    }
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -316,7 +319,8 @@ class MyInputMethodService : InputMethodService(),
                     )
 
                     if (!consumeKey) {
-                        ic.deleteSurroundingText(1, 0)
+                        ic.deleteSurroundingTextInCodePoints(1,0)
+//                        ic.deleteSurroundingText(1, 0)
                     }
                 }
             }
@@ -442,9 +446,16 @@ class MyInputMethodService : InputMethodService(),
     }
 
     override fun onToggleRimeOption(option: String) {
+        val currentValue = when (option) {
+            RimeOptions.ASCII_PUNCT -> uiState.asciiPunct
+            RimeOptions.TRADITIONALIZATION -> uiState.simplified
+            RimeOptions.FULL_SHAPE -> uiState.fullShape
+            RimeOptions.EMOJI -> uiState.emoji
+            else -> false
+        }
         launchWithMain {
             val newValue = withRimeContext { session ->
-                KeyboardPreferencesManager.toggleOption(applicationContext, session, option)
+                KeyboardPreferencesManager.toggleOption(applicationContext, session, option, currentValue)
             }
             uiState = when (option) {
                 RimeOptions.ASCII_PUNCT -> uiState.copy(asciiPunct = newValue)

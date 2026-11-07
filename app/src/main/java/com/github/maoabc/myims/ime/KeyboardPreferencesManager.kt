@@ -74,9 +74,8 @@ object KeyboardPreferencesManager {
         session.setOption(RimeOptions.EMOJI, options.emoji)
     }
 
-    suspend fun toggleOption(context: Context, session: RimeSession, option: String): Boolean {
-        val current = session.getOption(option)
-        val next = !current
+    suspend fun toggleOption(context: Context, session: RimeSession, option: String, currentValue: Boolean): Boolean {
+        val next = !currentValue
         session.setOption(option, next)
 
         val key = when (option) {
