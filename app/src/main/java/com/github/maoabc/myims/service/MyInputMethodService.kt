@@ -46,6 +46,7 @@ import com.github.maoabc.myims.ui.keyboard.TextMoveActions
 import com.github.maoabc.myims.ui.keyboard.TextMoveCommand
 import androidx.lifecycle.lifecycleScope
 import com.github.maoabc.librime.RimeAPI
+import com.github.maoabc.myims.ime.KeyboardMode
 import com.github.maoabc.myims.ime.RimeManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -106,6 +107,8 @@ class MyInputMethodService : InputMethodService(),
                     emoji = uiState.emoji
                 )
             )
+            val langTag = getCurrentSubtype()
+            this.setOption(RimeOptions.ASCII_MODE, langTag.contains("en"))
         }.also { rimeSessionInstance = it }
         block(session)
     }
@@ -114,6 +117,21 @@ class MyInputMethodService : InputMethodService(),
         super.onCreate()
         savedStateRegistryController.performRestore(null)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_CREATE)
+
+        RimeManager.onDeployed = {
+            launchWithMain {
+                withRimeContext {
+                    rimeSessionInstance?.close()
+                    rimeSessionInstance = null
+                }
+                uiState = uiState.copy(
+                    keyboardMode = KeyboardMode.QWERTY,
+                    composingText = "",
+                    candidates = mutableObjectListOf(),
+                    isCandidatesExpanded = false
+                )
+            }
+        }
 
         // Load persisted preferences into UI state (Direct Boot compatible)
         lifecycleScope.launch(Dispatchers.IO) {
@@ -139,6 +157,8 @@ class MyInputMethodService : InputMethodService(),
     override fun onCreateInputView(): View {
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_START)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
+
+        uiState = uiState.copy(keyboardMode = KeyboardMode.QWERTY)
 
         window?.window?.let { window ->
             WindowCompat.setDecorFitsSystemWindows(window, false)
@@ -269,10 +289,15 @@ class MyInputMethodService : InputMethodService(),
 
     override fun onDestroy() {
         super.onDestroy()
+        RimeManager.onDeployed = null
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
         store.clear()
-        rimeSessionInstance?.close()
-        rimeSessionInstance = null
+        launchWithMain {
+            withRimeContext {
+                rimeSessionInstance?.close()
+                rimeSessionInstance = null
+            }
+        }
     }
 
     // --- ImeActionHandler Implementation ---

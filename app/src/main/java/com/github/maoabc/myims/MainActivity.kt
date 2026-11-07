@@ -19,6 +19,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Keyboard
@@ -40,15 +42,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.compose.LifecycleResumeEffect
-import com.github.maoabc.librime.RimeSession
 import com.github.maoabc.myims.service.MyInputMethodService
 import com.github.maoabc.myims.ui.theme.GboardTheme
 
@@ -71,14 +70,8 @@ fun MainScreen() {
     var testText by remember { mutableStateOf("") }
     var isDeploying by remember { mutableStateOf(false) }
 
-    var isImeEnabled by remember { mutableStateOf(isImeEnabled(context)) }
-    var isImeSelected by remember { mutableStateOf(isImeSelected(context)) }
-
-    LifecycleResumeEffect(Unit) {
-        isImeEnabled = isImeEnabled(context)
-        isImeSelected = isImeSelected(context)
-        onPauseOrDispose {}
-    }
+    val isImeEnabled = remember(context) { isImeEnabled(context) }
+    val isImeSelected = remember(context) { isImeSelected(context) }
 
     Scaffold(
         topBar = {
@@ -91,6 +84,7 @@ fun MainScreen() {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                .verticalScroll(rememberScrollState())
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {

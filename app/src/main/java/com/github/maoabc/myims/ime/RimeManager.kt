@@ -9,11 +9,16 @@ import java.util.zip.ZipInputStream
 
 object RimeManager {
     private var isInitialized = false
+    var onDeployed: (() -> Unit)? = null
 
     @Synchronized
     fun deploy(context: Context): Boolean {
         ensureInitialized(context.applicationContext)
-        return RimeAPI.deploy()
+        val success = RimeAPI.deploy()
+        if (success) {
+            onDeployed?.invoke()
+        }
+        return success
     }
 
 
