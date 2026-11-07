@@ -175,14 +175,39 @@ class MyInputMethodService : InputMethodService(),
         }
     }
 
+    private fun updateSubtypeAndLanguage() {
+        val langTag = getCurrentSubtype()
+        launchWithMain {
+            withRimeContext { session ->
+                session.setOption(RimeOptions.ASCII_MODE, langTag.contains("en"))
+            }
+            uiState = uiState.copy(
+                languageLabel = langTag
+            )
+        }
+    }
+
+    override fun onStartInput(info: EditorInfo?, restarting: Boolean) {
+        super.onStartInput(info, restarting)
+        updateSubtypeAndLanguage()
+    }
+
+    override fun onWindowShown() {
+        super.onWindowShown()
+        updateSubtypeAndLanguage()
+    }
+
     private fun getCurrentSubtype(): String {
         val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
         val currentSubtype = imm.currentInputMethodSubtype
+            ?: return uiState.languageLabel.ifEmpty { "en" }
         return convertModeToLangTag(currentSubtype)
     }
 
     private fun convertModeToLangTag(currentSubtype: InputMethodSubtype?): String {
-        if (currentSubtype == null) return "cn"
+        if (currentSubtype == null) {
+            return uiState.languageLabel.ifEmpty { "en" }
+        }
         val mode = currentSubtype.mode ?: ""
 
         @Suppress("DEPRECATION")
@@ -319,7 +344,7 @@ class MyInputMethodService : InputMethodService(),
                     )
 
                     if (!consumeKey) {
-                        ic.deleteSurroundingTextInCodePoints(1,0)
+                        ic.deleteSurroundingTextInCodePoints(1, 0)
 //                        ic.deleteSurroundingText(1, 0)
                     }
                 }
@@ -455,7 +480,12 @@ class MyInputMethodService : InputMethodService(),
         }
         launchWithMain {
             val newValue = withRimeContext { session ->
-                KeyboardPreferencesManager.toggleOption(applicationContext, session, option, currentValue)
+                KeyboardPreferencesManager.toggleOption(
+                    applicationContext,
+                    session,
+                    option,
+                    currentValue
+                )
             }
             uiState = when (option) {
                 RimeOptions.ASCII_PUNCT -> uiState.copy(asciiPunct = newValue)
