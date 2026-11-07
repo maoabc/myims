@@ -258,11 +258,16 @@ class MyInputMethodService : InputMethodService(),
                 session.setOption(RimeOptions.ASCII_MODE, langTag.contains("en"))
             }
             uiState = uiState.copy(
+                keyboardMode = KeyboardMode.QWERTY,
                 imeOptions = info?.imeOptions ?: EditorInfo.IME_ACTION_UNSPECIFIED,
                 composingText = "",
                 candidates = mutableObjectListOf(),
                 languageLabel = langTag,
-                isCandidatesExpanded = false
+                isCandidatesExpanded = false,
+                isMenuPanelOpen = false,
+                isEmojiPanelOpen = false,
+                isTextEditPanelOpen = false
+
             )
         }
     }
