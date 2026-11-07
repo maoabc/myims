@@ -86,8 +86,8 @@ fun ExpandedCandidatesPanel(
     LaunchedEffect(lastVisibleItemIndexState.value) {
         val totalItemsCount = gridState.layoutInfo.totalItemsCount
         val lastVisibleIndex = lastVisibleItemIndexState.value
-        if (lastVisibleIndex >= totalItemsCount - 18) {
-//            println("rime: loadMore $totalItemsCount $lastVisibleIndex")
+        if (candidates.size > 0 && lastVisibleIndex >= totalItemsCount - 18) {
+//            println("rime: loadMore $totalItemsCount $lastVisibleIndex ${candidates.size}")
             onLoadMore()
         }
     }
