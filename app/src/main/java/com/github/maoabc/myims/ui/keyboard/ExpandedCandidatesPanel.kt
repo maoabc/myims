@@ -78,16 +78,16 @@ fun ExpandedCandidatesPanel(
         if (viewportHeight > 0f) maxOf(viewportHeight, minFiveRows) else minFiveRows
     }
 
-    val shouldLoadMore = remember {
+    val lastVisibleItemIndexState = remember {
         derivedStateOf {
-            val layoutInfo = gridState.layoutInfo
-            val totalItemsCount = layoutInfo.totalItemsCount
-            val lastVisibleItemIndex = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-            totalItemsCount >= 0 && lastVisibleItemIndex >= totalItemsCount - 1
+            gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
         }
     }
-    LaunchedEffect(shouldLoadMore.value) {
-        if (shouldLoadMore.value) {
+    LaunchedEffect(lastVisibleItemIndexState.value) {
+        val totalItemsCount = gridState.layoutInfo.totalItemsCount
+        val lastVisibleIndex = lastVisibleItemIndexState.value
+        if (lastVisibleIndex >= totalItemsCount - 18) {
+//            println("rime: loadMore $totalItemsCount $lastVisibleIndex")
             onLoadMore()
         }
     }
