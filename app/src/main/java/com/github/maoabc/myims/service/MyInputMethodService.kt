@@ -35,7 +35,6 @@ import com.github.maoabc.librime.RimeSession
 import com.github.maoabc.myims.MainActivity
 import com.github.maoabc.myims.ime.ImeActionHandler
 import com.github.maoabc.myims.ime.ImeUiState
-import com.github.maoabc.myims.ime.KeyboardOptions
 import com.github.maoabc.myims.ime.KeyboardPreferencesManager
 import com.github.maoabc.myims.ime.KeyData
 import com.github.maoabc.myims.ime.KeyType
@@ -60,6 +59,8 @@ class MyInputMethodService : InputMethodService(),
     SavedStateRegistryOwner,
     ViewModelStoreOwner,
     ImeActionHandler {
+
+    private val TAG: String = "rime"
 
     private val lifecycleRegistry = LifecycleRegistry(this)
     private val savedStateRegistryController = SavedStateRegistryController.create(this)
@@ -98,15 +99,10 @@ class MyInputMethodService : InputMethodService(),
     ): T = withContext(rimeDispatcher) {
         RimeManager.ensureInitialized(applicationContext)
         val session = rimeSessionInstance ?: createSession().apply {
-            KeyboardPreferencesManager.applyToSession(
-                this,
-                KeyboardOptions(
-                    asciiPunct = uiState.asciiPunct,
-                    fullShape = uiState.fullShape,
-                    simplified = uiState.simplified,
-                    emoji = uiState.emoji
-                )
-            )
+            val options = KeyboardPreferencesManager.loadOptions(applicationContext)
+            options?.let {
+                KeyboardPreferencesManager.applyToSession(this, options)
+            }
             val langTag = getCurrentSubtype()
             this.setOption(RimeOptions.ASCII_MODE, langTag.contains("en"))
         }.also { rimeSessionInstance = it }
@@ -120,36 +116,23 @@ class MyInputMethodService : InputMethodService(),
 
         RimeManager.onDeployed = {
             launchWithMain {
-                withRimeContext {
-                    rimeSessionInstance?.close()
+                val options = withRimeContext {
+                    val options = KeyboardPreferencesManager.getOptionsFromSession(it)
+                    it.close()
                     rimeSessionInstance = null
+                    options
                 }
+                println("rime: ${options.tradition}")
                 uiState = uiState.copy(
                     keyboardMode = KeyboardMode.QWERTY,
                     composingText = "",
                     candidates = mutableObjectListOf(),
+                    asciiPunct = options.asciiPunct,
+                    emoji = options.emoji,
+                    fullShape = options.fullShape,
+                    tradition = options.tradition,
                     isCandidatesExpanded = false
                 )
-            }
-        }
-
-        // Load persisted preferences into UI state (Direct Boot compatible)
-        lifecycleScope.launch(Dispatchers.IO) {
-            try {
-                val options = KeyboardPreferencesManager.loadOptions(applicationContext)
-                withContext(Dispatchers.Main) {
-                    uiState = uiState.copy(
-                        asciiPunct = options.asciiPunct,
-                        fullShape = options.fullShape,
-                        simplified = options.simplified,
-                        emoji = options.emoji
-                    )
-                    rimeSessionInstance?.let { session ->
-                        KeyboardPreferencesManager.applyToSession(session, options)
-                    }
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
             }
         }
     }
@@ -207,10 +190,22 @@ class MyInputMethodService : InputMethodService(),
         }
     }
 
+
+    //override fun onEvaluateInputViewShown(): Boolean {
+    //    println("rime: onEvaluate")
+    //    return super.onEvaluateInputViewShown()
+    //}
+    //override fun onConfigurationChanged(newConfig: Configuration) {
+    //    super.onConfigurationChanged(newConfig)
+    //    println("rime: config $newConfig")
+    //}
+
     override fun onStartInput(info: EditorInfo?, restarting: Boolean) {
         super.onStartInput(info, restarting)
+
         updateSubtypeAndLanguage()
     }
+
 
     override fun onWindowShown() {
         super.onWindowShown()
@@ -253,9 +248,11 @@ class MyInputMethodService : InputMethodService(),
             lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
         }
         launchWithMain {
-            withRimeContext { session ->
+            val options = withRimeContext { session ->
                 session.clearComposition()
                 session.setOption(RimeOptions.ASCII_MODE, langTag.contains("en"))
+
+                KeyboardPreferencesManager.getOptionsFromSession(session)
             }
             uiState = uiState.copy(
                 keyboardMode = KeyboardMode.QWERTY,
@@ -266,9 +263,13 @@ class MyInputMethodService : InputMethodService(),
                 isCandidatesExpanded = false,
                 isMenuPanelOpen = false,
                 isEmojiPanelOpen = false,
-                isTextEditPanelOpen = false
+                isTextEditPanelOpen = false,
+                asciiPunct = options.asciiPunct,
+                emoji = options.emoji,
+                fullShape = options.fullShape,
+                tradition = options.tradition,
 
-            )
+                )
         }
     }
 
@@ -299,11 +300,50 @@ class MyInputMethodService : InputMethodService(),
         store.clear()
         launchWithMain {
             withRimeContext {
-                rimeSessionInstance?.close()
+                it.close()
                 rimeSessionInstance = null
             }
         }
     }
+
+    //override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+    //    println("rime: onKeyDown $keyCode $event")
+    //    return super.onKeyDown(keyCode, event)
+    //}
+
+    //override fun onKeyLongPress(keyCode: Int, event: KeyEvent?): Boolean {
+    //    println("rime: onKeyLong $keyCode $event")
+    //    return super.onKeyLongPress(keyCode, event)
+    //}
+
+    //override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
+    //    println("rime: onKeyUp $keyCode $event")
+    //    return super.onKeyUp(keyCode, event)
+    //}
+
+    //override fun onUpdateSelection(
+    //    oldSelStart: Int,
+    //    oldSelEnd: Int,
+    //    newSelStart: Int,
+    //    newSelEnd: Int,
+    //    candidatesStart: Int,
+    //    candidatesEnd: Int
+    //) {
+    //    super.onUpdateSelection(
+    //        oldSelStart,
+    //        oldSelEnd,
+    //        newSelStart,
+    //        newSelEnd,
+    //        candidatesStart,
+    //        candidatesEnd
+    //    )
+    //    println("rime: onUpdateSelection $oldSelStart $oldSelEnd $newSelStart $newSelEnd")
+    //}
+
+    //override fun onUpdateCursorAnchorInfo(cursorAnchorInfo: CursorAnchorInfo?) {
+    //    Log.d(TAG, "onUpdateCursorAnchorInfo: "+cursorAnchorInfo?.matrix)
+    //}
+
 
     // --- ImeActionHandler Implementation ---
 
@@ -503,7 +543,7 @@ class MyInputMethodService : InputMethodService(),
     override fun onToggleRimeOption(option: String) {
         val currentValue = when (option) {
             RimeOptions.ASCII_PUNCT -> uiState.asciiPunct
-            RimeOptions.TRADITIONALIZATION -> uiState.simplified
+            RimeOptions.TRADITIONALIZATION -> uiState.tradition
             RimeOptions.FULL_SHAPE -> uiState.fullShape
             RimeOptions.EMOJI -> uiState.emoji
             else -> false
@@ -519,7 +559,7 @@ class MyInputMethodService : InputMethodService(),
             }
             uiState = when (option) {
                 RimeOptions.ASCII_PUNCT -> uiState.copy(asciiPunct = newValue)
-                RimeOptions.TRADITIONALIZATION -> uiState.copy(simplified = newValue)
+                RimeOptions.TRADITIONALIZATION -> uiState.copy(tradition = newValue)
                 RimeOptions.FULL_SHAPE -> uiState.copy(fullShape = newValue)
                 RimeOptions.EMOJI -> uiState.copy(emoji = newValue)
                 else -> uiState

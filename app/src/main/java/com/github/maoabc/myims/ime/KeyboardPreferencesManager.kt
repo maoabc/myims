@@ -24,7 +24,7 @@ object RimeOptions {
 data class KeyboardOptions(
     val asciiPunct: Boolean = false,
     val fullShape: Boolean = false,
-    val simplified: Boolean = true,
+    val tradition: Boolean = true,
     val emoji: Boolean = true
 )
 
@@ -34,7 +34,7 @@ object KeyboardPreferencesManager {
     private object Keys {
         val ASCII_PUNCT = booleanPreferencesKey(RimeOptions.ASCII_PUNCT)
         val FULL_SHAPE = booleanPreferencesKey(RimeOptions.FULL_SHAPE)
-        val SIMPLIFIED = booleanPreferencesKey(RimeOptions.TRADITIONALIZATION)
+        val TRADITION = booleanPreferencesKey(RimeOptions.TRADITIONALIZATION)
         val EMOJI = booleanPreferencesKey(RimeOptions.EMOJI)
     }
 
@@ -57,21 +57,34 @@ object KeyboardPreferencesManager {
         }
     }
 
-    suspend fun loadOptions(context: Context): KeyboardOptions {
-        val prefs = getDataStore(context).data.first()
-        return KeyboardOptions(
-            asciiPunct = prefs[Keys.ASCII_PUNCT] ?: false,
-            fullShape = prefs[Keys.FULL_SHAPE] ?: false,
-            simplified = prefs[Keys.SIMPLIFIED] ?: true,
-            emoji = prefs[Keys.EMOJI] ?: true
-        )
+    suspend fun loadOptions(context: Context): KeyboardOptions? {
+        try {
+            val prefs = getDataStore(context).data.first()
+            return KeyboardOptions(
+                asciiPunct = prefs[Keys.ASCII_PUNCT] ?: false,
+                fullShape = prefs[Keys.FULL_SHAPE] ?: false,
+                tradition = prefs[Keys.TRADITION] ?: true,
+                emoji = prefs[Keys.EMOJI] ?: true
+            )
+        } catch (_: Exception) {
+        }
+        return null
     }
 
     fun applyToSession(session: RimeSession, options: KeyboardOptions) {
         session.setOption(RimeOptions.ASCII_PUNCT, options.asciiPunct)
-        session.setOption(RimeOptions.TRADITIONALIZATION, options.simplified)
+        session.setOption(RimeOptions.TRADITIONALIZATION, options.tradition)
         session.setOption(RimeOptions.FULL_SHAPE, options.fullShape)
         session.setOption(RimeOptions.EMOJI, options.emoji)
+    }
+
+    fun getOptionsFromSession(session: RimeSession): KeyboardOptions {
+        return KeyboardOptions(
+            asciiPunct = session.getOption(RimeOptions.ASCII_PUNCT),
+            fullShape = session.getOption(RimeOptions.FULL_SHAPE),
+            emoji = session.getOption(RimeOptions.EMOJI),
+            tradition = session.getOption(RimeOptions.TRADITIONALIZATION)
+        )
     }
 
     suspend fun toggleOption(
@@ -86,7 +99,7 @@ object KeyboardPreferencesManager {
         val key = when (option) {
             RimeOptions.ASCII_PUNCT -> Keys.ASCII_PUNCT
             RimeOptions.FULL_SHAPE -> Keys.FULL_SHAPE
-            RimeOptions.TRADITIONALIZATION -> Keys.SIMPLIFIED
+            RimeOptions.TRADITIONALIZATION -> Keys.TRADITION
             RimeOptions.EMOJI -> Keys.EMOJI
             else -> null
         }

@@ -39,7 +39,7 @@ data class ImeUiState(
     val isMenuPanelOpen: Boolean = false,
     val asciiPunct: Boolean = false,
     val fullShape: Boolean = false,
-    val simplified: Boolean = true,
+    val tradition: Boolean = false,
     val emoji: Boolean = true,
     val bottomInsetDp: Int = 0,
     val imeOptions: Int = EditorInfo.IME_ACTION_UNSPECIFIED,
