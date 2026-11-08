@@ -355,7 +355,6 @@ class MyInputMethodService : InputMethodService(),
                 val textToCommit = keyData.primaryText
                 launchWithMain {
                     val (composingText, commitText, candidates) = withRimeContext { session ->
-                        val s = uptimeMillis()
                         if (session.processKey(textToCommit.codePointAt(0), 0)) {
                             val candidates = rimeGetCandidates(session, 0, 10, 60)
                             RimeResult(
@@ -414,7 +413,8 @@ class MyInputMethodService : InputMethodService(),
                     )
 
                     if (!consumeKey) {
-                        ic.deleteSurroundingTextInCodePoints(1, 0)
+                        sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
+//                        ic.deleteSurroundingTextInCodePoints(1, 0)
 //                        ic.deleteSurroundingText(1, 0)
                     }
                 }
@@ -428,18 +428,25 @@ class MyInputMethodService : InputMethodService(),
 
             KeyType.SPACE -> {
                 launchWithMain {
-                    val commitText = withRimeContext { session ->
+                    val (composingText, commitText, candidates) = withRimeContext { session ->
                         if (session.processKey(0x20, 0)) {
-                            session.commitText
+                            val candidates = rimeGetCandidates(session, 0, 10, 60)
+                            RimeResult(session.composingText, session.commitText, candidates, true)
                         } else {
-                            null
+                            RimeResult(
+                                "", "${session.commitText} ",
+                                mutableObjectListOf(),
+                                false
+                            )
                         }
                     }
-                    if (commitText != null) {
+                    uiState = uiState.copy(
+                        composingText = composingText,
+                        candidates = candidates
+                    )
+
+                    if (commitText.isNotEmpty()) {
                         ic.commitText(commitText, 1)
-                        onClearComposing()
-                    } else {
-                        ic.commitText(" ", 1)
                     }
                 }
             }
