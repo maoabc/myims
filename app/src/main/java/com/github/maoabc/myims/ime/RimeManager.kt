@@ -15,6 +15,7 @@ object RimeManager {
     fun deploy(context: Context): Boolean {
         ensureInitialized(context.applicationContext)
         val success = RimeAPI.deploy()
+        RimeAPI.syncUserData()
         if (success) {
             onDeployed?.invoke()
         }
