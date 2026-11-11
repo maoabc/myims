@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -30,6 +29,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -43,7 +43,6 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntOffset
@@ -56,7 +55,6 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import com.github.maoabc.librime.RimeCandidate
-import com.github.maoabc.myims.R
 import com.github.maoabc.myims.ui.theme.GboardTheme
 import com.github.maoabc.myims.ui.theme.LocalKeyboardColors
 
@@ -116,6 +114,7 @@ fun CandidateBar(
     onCandidateClick: (RimeCandidate) -> Unit,
     onToggleExpand: () -> Unit,
     modifier: Modifier = Modifier,
+    onDeleteCandidate: (RimeCandidate) -> Unit = {},
     onToggleEmojiPanel: () -> Unit = {},
     onToggleTextEditPanel: () -> Unit = {},
     onToggleMenuPanel: () -> Unit = {},
@@ -126,7 +125,7 @@ fun CandidateBar(
     onVisibleCountChanged: (Int) -> Unit = {},
 ) {
     val keyboardColors = LocalKeyboardColors.current
-    var renderedCount by remember { mutableStateOf(candidates.size) }
+    var renderedCount by remember { mutableIntStateOf(candidates.size) }
 
     SideEffect {
         onVisibleCountChanged(renderedCount)
@@ -135,7 +134,7 @@ fun CandidateBar(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(42.dp)
+            .height(36.dp)
     ) {
         if (isTextEditOpen) {
             // Text Edit Mode Header in CandidateBar: Left arrow + Title "文本编辑"
@@ -235,10 +234,11 @@ fun CandidateBar(
                     for (index in candidates.indices) {
                         val candidate = candidates[index]
                         val measurable = subcompose(index) {
+                            var showMenu by remember { mutableStateOf(false) }
                             Box(
                                 modifier = Modifier
                                     .clickable { onCandidateClick(candidate) }
-                                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                                    .padding(horizontal = 8.dp, vertical = 2.dp),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
@@ -247,6 +247,13 @@ fun CandidateBar(
                                     fontSize = 18.sp,
                                     fontWeight = FontWeight.Normal,
                                     maxLines = 1
+                                )
+
+                                CandidateContextMenu(
+                                    candidate = candidate,
+                                    expanded = showMenu,
+                                    onDismissRequest = { showMenu = false },
+                                    onDeleteCandidate = onDeleteCandidate
                                 )
                             }
                         }.first()
@@ -389,7 +396,7 @@ fun CandidateBar(
 @Composable
 fun CandidateBarPreview() {
     GboardTheme {
-        Box(modifier = Modifier.fillMaxWidth().height(42.dp)) {
+        Box(modifier = Modifier.fillMaxWidth().height(36.dp)) {
             CandidateBar(
                 composingText = "",
                 candidates = mutableObjectListOf(
@@ -409,7 +416,7 @@ fun CandidateBarPreview() {
 @Composable
 fun CandidateBarToolbarPreview() {
     GboardTheme {
-        Box(modifier = Modifier.fillMaxWidth().height(42.dp)) {
+        Box(modifier = Modifier.fillMaxWidth().height(36.dp)) {
             CandidateBar(
                 composingText = "",
                 candidates = mutableObjectListOf(),
@@ -425,7 +432,7 @@ fun CandidateBarToolbarPreview() {
 @Composable
 fun CandidateBarTextEditPreview() {
     GboardTheme {
-        Box(modifier = Modifier.fillMaxWidth().height(42.dp)) {
+        Box(modifier = Modifier.fillMaxWidth().height(36.dp)) {
             CandidateBar(
                 composingText = "",
                 candidates = mutableObjectListOf(),
@@ -442,7 +449,7 @@ fun CandidateBarTextEditPreview() {
 @Composable
 fun CandidateBarEmojiPreview() {
     GboardTheme {
-        Box(modifier = Modifier.fillMaxWidth().height(42.dp)) {
+        Box(modifier = Modifier.fillMaxWidth().height(36.dp)) {
             CandidateBar(
                 composingText = "",
                 candidates = mutableObjectListOf(),
@@ -459,7 +466,7 @@ fun CandidateBarEmojiPreview() {
 @Composable
 fun CandidateBarMenuPreview() {
     GboardTheme {
-        Box(modifier = Modifier.fillMaxWidth().height(42.dp)) {
+        Box(modifier = Modifier.fillMaxWidth().height(36.dp)) {
             CandidateBar(
                 composingText = "",
                 candidates = mutableObjectListOf(),

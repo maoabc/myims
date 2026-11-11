@@ -64,7 +64,7 @@ fun GboardKeyboard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 2.dp)
-                    .padding(top = 4.dp, bottom = effectiveBottomPadding)
+                    .padding(top = 2.dp, bottom = effectiveBottomPadding)
             ) {
                 // Candidate / Tool bar at the top
                 CandidateBar(
@@ -131,6 +131,7 @@ fun GboardKeyboard(
                     when (panelType) {
                         KeyboardPanelType.MENU -> {
                             MenuPanel(
+                                options = uiState.options,
                                 onToggleOption = { option -> actionHandler.onToggleRimeOption(option) },
                                 modifier = Modifier.fillMaxSize()
                             )
@@ -206,7 +207,6 @@ fun GboardKeyboard(
                                                 keyData = keyData,
                                                 shiftState = uiState.shiftState,
                                                 langLabel = uiState.languageLabel,
-                                                asciiPunct = uiState.asciiPunct,
                                                 modifier = Modifier.weight(keyData.weight),
                                                 onKeyClick = { clickedKey ->
                                                     actionHandler.onKeyClick(clickedKey)

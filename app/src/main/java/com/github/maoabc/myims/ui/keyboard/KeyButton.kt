@@ -46,6 +46,7 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import com.github.maoabc.myims.R
 import com.github.maoabc.myims.ime.HapticFeedbackHelper
+import com.github.maoabc.myims.ime.KeyboardPreferencesManager
 import com.github.maoabc.myims.ime.KeyData
 import com.github.maoabc.myims.ime.KeyType
 import com.github.maoabc.myims.ime.ShiftState
@@ -62,7 +63,6 @@ fun KeyButton(
     keyData: KeyData,
     shiftState: ShiftState,
     langLabel: String,
-    asciiPunct: Boolean,
     modifier: Modifier = Modifier,
     onKeyClick: (KeyData) -> Unit,
     onKeyLongPress: (KeyData) -> Unit = {}
@@ -72,6 +72,7 @@ fun KeyButton(
     val coroutineScope = rememberCoroutineScope()
     var isPressed by remember { mutableStateOf(false) }
     var isSwipingUp by remember { mutableStateOf(false) }
+    val asciiPunct = KeyboardPreferencesManager.options.asciiPunct
 
     val displayText = remember(keyData, shiftState) {
         if (keyData.type == KeyType.CHARACTER && shiftState.isCapitalized()) {
@@ -310,7 +311,6 @@ fun KeyButtonPreview() {
             keyData = KeyData(KeyType.CHARACTER, "a", "1"),
             shiftState = ShiftState.LOWERCASE,
             langLabel = "en",
-            asciiPunct = false,
             onKeyClick = {}
         )
     }

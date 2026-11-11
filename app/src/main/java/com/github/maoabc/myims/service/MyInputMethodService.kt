@@ -122,15 +122,11 @@ class MyInputMethodService : InputMethodService(),
                     rimeSessionInstance = null
                     options
                 }
-                println("rime: ${options.tradition}")
                 uiState = uiState.copy(
                     keyboardMode = KeyboardMode.QWERTY,
+                    options = options,
                     composingText = "",
                     candidates = mutableObjectListOf(),
-                    asciiPunct = options.asciiPunct,
-                    emoji = options.emoji,
-                    fullShape = options.fullShape,
-                    tradition = options.tradition,
                     isCandidatesExpanded = false
                 )
             }
@@ -260,16 +256,12 @@ class MyInputMethodService : InputMethodService(),
                 composingText = "",
                 candidates = mutableObjectListOf(),
                 languageLabel = langTag,
+                options = options,
                 isCandidatesExpanded = false,
                 isMenuPanelOpen = false,
                 isEmojiPanelOpen = false,
-                isTextEditPanelOpen = false,
-                asciiPunct = options.asciiPunct,
-                emoji = options.emoji,
-                fullShape = options.fullShape,
-                tradition = options.tradition,
-
-                )
+                isTextEditPanelOpen = false
+            )
         }
     }
 
@@ -549,11 +541,11 @@ class MyInputMethodService : InputMethodService(),
 
     override fun onToggleRimeOption(option: String) {
         val currentValue = when (option) {
-            RimeOptions.ASCII_PUNCT -> uiState.asciiPunct
-            RimeOptions.TRADITIONALIZATION -> uiState.tradition
-            RimeOptions.FULL_SHAPE -> uiState.fullShape
-            RimeOptions.EMOJI -> uiState.emoji
-            RimeOptions.VIBRATION -> KeyboardPreferencesManager.options.vibrationEnabled
+            RimeOptions.ASCII_PUNCT -> uiState.options.asciiPunct
+            RimeOptions.TRADITIONALIZATION -> uiState.options.tradition
+            RimeOptions.FULL_SHAPE -> uiState.options.fullShape
+            RimeOptions.EMOJI -> uiState.options.emoji
+            RimeOptions.VIBRATION -> uiState.options.vibrationEnabled
             else -> false
         }
         launchWithMain {
@@ -565,13 +557,15 @@ class MyInputMethodService : InputMethodService(),
                     currentValue
                 )
             }
-            uiState = when (option) {
-                RimeOptions.ASCII_PUNCT -> uiState.copy(asciiPunct = newValue)
-                RimeOptions.TRADITIONALIZATION -> uiState.copy(tradition = newValue)
-                RimeOptions.FULL_SHAPE -> uiState.copy(fullShape = newValue)
-                RimeOptions.EMOJI -> uiState.copy(emoji = newValue)
-                else -> uiState
+            val newOptions = when (option) {
+                RimeOptions.ASCII_PUNCT -> uiState.options.copy(asciiPunct = newValue)
+                RimeOptions.TRADITIONALIZATION -> uiState.options.copy(tradition = newValue)
+                RimeOptions.FULL_SHAPE -> uiState.options.copy(fullShape = newValue)
+                RimeOptions.EMOJI -> uiState.options.copy(emoji = newValue)
+                RimeOptions.VIBRATION -> uiState.options.copy(vibrationEnabled = newValue)
+                else -> uiState.options
             }
+            uiState = uiState.copy(options = newOptions)
         }
     }
 

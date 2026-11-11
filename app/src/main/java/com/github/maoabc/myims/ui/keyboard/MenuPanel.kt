@@ -40,7 +40,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.github.maoabc.myims.ime.HapticFeedbackHelper
-import com.github.maoabc.myims.ime.KeyboardPreferencesManager
+import com.github.maoabc.myims.ime.KeyboardOptions
 import com.github.maoabc.myims.ime.RimeOptions
 import com.github.maoabc.myims.ui.theme.GboardTheme
 import com.github.maoabc.myims.ui.theme.LocalKeyboardColors
@@ -54,13 +54,12 @@ data class MenuOptionItem(
 
 @Composable
 fun MenuPanel(
+    options: KeyboardOptions,
     onToggleOption: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val keyboardColors = LocalKeyboardColors.current
     val haptic = LocalHapticFeedback.current
-
-    val currentOptions = KeyboardPreferencesManager.options
 
     val items = listOf(
         MenuOptionItem(
@@ -108,11 +107,11 @@ fun MenuPanel(
         ) {
             items(items) { item ->
                 val rawState = when (item.key) {
-                    RimeOptions.FULL_SHAPE -> currentOptions.fullShape
-                    RimeOptions.ASCII_PUNCT -> currentOptions.asciiPunct
-                    RimeOptions.TRADITIONALIZATION -> currentOptions.tradition
-                    RimeOptions.EMOJI -> currentOptions.emoji
-                    RimeOptions.VIBRATION -> currentOptions.vibrationEnabled
+                    RimeOptions.FULL_SHAPE -> options.fullShape
+                    RimeOptions.ASCII_PUNCT -> options.asciiPunct
+                    RimeOptions.TRADITIONALIZATION -> options.tradition
+                    RimeOptions.EMOJI -> options.emoji
+                    RimeOptions.VIBRATION -> options.vibrationEnabled
                     else -> false
                 }
 
@@ -170,6 +169,7 @@ fun MenuPanelPreview() {
     GboardTheme {
         Box(modifier = Modifier.width(360.dp).height(200.dp)) {
             MenuPanel(
+                options = KeyboardOptions(),
                 onToggleOption = {},
                 modifier = Modifier.fillMaxSize()
             )

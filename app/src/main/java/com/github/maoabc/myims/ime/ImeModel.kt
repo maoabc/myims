@@ -37,11 +37,7 @@ data class ImeUiState(
     val isTextEditPanelOpen: Boolean = false,
     val isTextSelecting: Boolean = false,
     val isMenuPanelOpen: Boolean = false,
-    val asciiPunct: Boolean = false,
-    val fullShape: Boolean = false,
-    val tradition: Boolean = false,
-    val emoji: Boolean = true,
-    val vibrationEnabled: Boolean = true,
+    val options: KeyboardOptions = KeyboardOptions(),
     val bottomInsetDp: Int = 0,
     val imeOptions: Int = EditorInfo.IME_ACTION_UNSPECIFIED,
     val languageLabel: String = "en"

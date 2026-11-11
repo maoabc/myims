@@ -66,7 +66,7 @@ object KeyboardPreferencesManager {
         }
     }
 
-    suspend fun loadOptions(context: Context): KeyboardOptions {
+    suspend fun loadOptions(context: Context): KeyboardOptions? {
         try {
             val prefs = getDataStore(context).data.first()
             options = KeyboardOptions(
@@ -77,6 +77,7 @@ object KeyboardPreferencesManager {
                 vibrationEnabled = prefs[Keys.VIBRATION] ?: true
             )
         } catch (_: Exception) {
+            return null
         }
         return options
     }
