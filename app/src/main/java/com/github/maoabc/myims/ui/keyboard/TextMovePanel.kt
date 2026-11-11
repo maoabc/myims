@@ -41,6 +41,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.github.maoabc.myims.ime.HapticFeedbackHelper
 import com.github.maoabc.myims.ui.theme.GboardTheme
 import com.github.maoabc.myims.ui.theme.LocalKeyboardColors
 
@@ -128,7 +129,7 @@ fun TextMovePanel(
                             .shadow(2.dp, RoundedCornerShape(8.dp))
                             .clip(RoundedCornerShape(8.dp))
                             .clickable {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                HapticFeedbackHelper.performTap(haptic)
                                 onAction(TextMoveCommand.TOGGLE_SELECT)
                             },
                         color = if (isSelecting) keyboardColors.keyPrimaryActionBackground else keyboardColors.keyActionBackground
@@ -187,11 +188,11 @@ fun TextMovePanel(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 TextEditBottomNavButton(icon = Icons.Default.FirstPage, modifier = Modifier.weight(1f)) {
-                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    HapticFeedbackHelper.performTap(haptic)
                     onAction(TextMoveCommand.HOME)
                 }
                 TextEditBottomNavButton(icon = Icons.AutoMirrored.Filled.LastPage, modifier = Modifier.weight(1f)) {
-                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    HapticFeedbackHelper.performTap(haptic)
                     onAction(TextMoveCommand.END)
                 }
             }
@@ -207,15 +208,15 @@ fun TextMovePanel(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             TextEditSideButton(text = "全选", modifier = Modifier.weight(1f)) {
-                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                HapticFeedbackHelper.performTap(haptic)
                 onAction(TextMoveCommand.SELECT_ALL)
             }
             TextEditSideButton(text = "复制", modifier = Modifier.weight(1f)) {
-                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                HapticFeedbackHelper.performTap(haptic)
                 onAction(TextMoveCommand.COPY)
             }
             TextEditSideButton(text = "粘贴", modifier = Modifier.weight(1f)) {
-                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                HapticFeedbackHelper.performTap(haptic)
                 onAction(TextMoveCommand.PASTE)
             }
             // Delete with repeat action
@@ -256,7 +257,7 @@ private fun TextEditRepeatButton(
             .pointerInput(onClick) {
                 detectTapGestures(
                     onPress = {
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        HapticFeedbackHelper.performTap(haptic)
                         val repeatJob = coroutineScope.launchRepeatAction {
                             onClick()
                         }

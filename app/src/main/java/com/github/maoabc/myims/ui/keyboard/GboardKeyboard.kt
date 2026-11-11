@@ -131,10 +131,6 @@ fun GboardKeyboard(
                     when (panelType) {
                         KeyboardPanelType.MENU -> {
                             MenuPanel(
-                                asciiPunct = uiState.asciiPunct,
-                                fullShape = uiState.fullShape,
-                                simplified = uiState.tradition,
-                                emoji = uiState.emoji,
                                 onToggleOption = { option -> actionHandler.onToggleRimeOption(option) },
                                 modifier = Modifier.fillMaxSize()
                             )

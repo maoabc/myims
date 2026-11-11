@@ -553,6 +553,7 @@ class MyInputMethodService : InputMethodService(),
             RimeOptions.TRADITIONALIZATION -> uiState.tradition
             RimeOptions.FULL_SHAPE -> uiState.fullShape
             RimeOptions.EMOJI -> uiState.emoji
+            RimeOptions.VIBRATION -> KeyboardPreferencesManager.options.vibrationEnabled
             else -> false
         }
         launchWithMain {

@@ -18,12 +18,12 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Abc
 import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.SentimentSatisfied
 import androidx.compose.material.icons.filled.Title
 import androidx.compose.material.icons.filled.Translate
+import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -39,6 +39,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.github.maoabc.myims.ime.HapticFeedbackHelper
+import com.github.maoabc.myims.ime.KeyboardPreferencesManager
 import com.github.maoabc.myims.ime.RimeOptions
 import com.github.maoabc.myims.ui.theme.GboardTheme
 import com.github.maoabc.myims.ui.theme.LocalKeyboardColors
@@ -52,22 +54,20 @@ data class MenuOptionItem(
 
 @Composable
 fun MenuPanel(
-    asciiPunct: Boolean,
-    fullShape: Boolean,
-    simplified: Boolean,
-    emoji: Boolean,
     onToggleOption: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val keyboardColors = LocalKeyboardColors.current
     val haptic = LocalHapticFeedback.current
 
+    val currentOptions = KeyboardPreferencesManager.options
+
     val items = listOf(
         MenuOptionItem(
             key = RimeOptions.FULL_SHAPE,
             getTitle = { active -> if (active) "半角" else "全角" },
             getIcon = { active -> if (active) Icons.Default.Bedtime else Icons.Default.Circle },
-            isActive = { rawState -> !rawState } // half shape is active when full_shape is false
+            isActive = { rawState -> !rawState }
         ),
         MenuOptionItem(
             key = RimeOptions.ASCII_PUNCT,
@@ -86,6 +86,12 @@ fun MenuPanel(
             getTitle = { _ -> "Emoji" },
             getIcon = { _ -> Icons.Default.SentimentSatisfied },
             isActive = { rawState -> rawState }
+        ),
+        MenuOptionItem(
+            key = RimeOptions.VIBRATION,
+            getTitle = { active -> if (active) "振动开" else "振动关" },
+            getIcon = { _ -> Icons.Default.Vibration },
+            isActive = { rawState -> rawState }
         )
     )
 
@@ -102,10 +108,11 @@ fun MenuPanel(
         ) {
             items(items) { item ->
                 val rawState = when (item.key) {
-                    RimeOptions.FULL_SHAPE -> fullShape
-                    RimeOptions.ASCII_PUNCT -> asciiPunct
-                    RimeOptions.TRADITIONALIZATION -> simplified
-                    RimeOptions.EMOJI -> emoji
+                    RimeOptions.FULL_SHAPE -> currentOptions.fullShape
+                    RimeOptions.ASCII_PUNCT -> currentOptions.asciiPunct
+                    RimeOptions.TRADITIONALIZATION -> currentOptions.tradition
+                    RimeOptions.EMOJI -> currentOptions.emoji
+                    RimeOptions.VIBRATION -> currentOptions.vibrationEnabled
                     else -> false
                 }
 
@@ -122,7 +129,7 @@ fun MenuPanel(
                             interactionSource = interactionSource,
                             indication = null
                         ) {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            HapticFeedbackHelper.performTap(haptic)
                             onToggleOption(item.key)
                         },
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -163,10 +170,6 @@ fun MenuPanelPreview() {
     GboardTheme {
         Box(modifier = Modifier.width(360.dp).height(200.dp)) {
             MenuPanel(
-                asciiPunct = false,
-                fullShape = false,
-                simplified = true,
-                emoji = true,
                 onToggleOption = {},
                 modifier = Modifier.fillMaxSize()
             )

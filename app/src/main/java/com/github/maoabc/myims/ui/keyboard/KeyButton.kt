@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import com.github.maoabc.myims.R
+import com.github.maoabc.myims.ime.HapticFeedbackHelper
 import com.github.maoabc.myims.ime.KeyData
 import com.github.maoabc.myims.ime.KeyType
 import com.github.maoabc.myims.ime.ShiftState
@@ -130,7 +131,7 @@ fun KeyButton(
                             if (!isSwipingUp) {
                                 longPressTriggered = true
                                 if (keyData.type != KeyType.BACKSPACE) {
-//                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    HapticFeedbackHelper.performLongPress(haptic)
                                     onKeyLongPress(keyData)
                                 }
                             }
@@ -139,6 +140,7 @@ fun KeyButton(
                         var repeatJob: Job? = null
                         if (keyData.type == KeyType.BACKSPACE) {
                             repeatJob = coroutineScope.launchRepeatAction {
+                                HapticFeedbackHelper.performTap(haptic)
                                 onKeyClick(keyData)
                             }
                         }
@@ -174,8 +176,8 @@ fun KeyButton(
 
                         if (!longPressTriggered) {
                             if (keyData.type != KeyType.BACKSPACE) {
+                                HapticFeedbackHelper.performTap(haptic)
                                 if (isSwipingUp && !keyData.secondaryText.isNullOrEmpty()) {
-//                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                     onKeyClick(keyData.copy(primaryText = keyData.secondaryText))
                                 } else {
                                     onKeyClick(

@@ -47,6 +47,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.github.maoabc.myims.ime.EmojiCategories
+import com.github.maoabc.myims.ime.HapticFeedbackHelper
 import com.github.maoabc.myims.ui.theme.GboardTheme
 import com.github.maoabc.myims.ui.theme.LocalKeyboardColors
 import kotlinx.coroutines.launch
@@ -119,7 +120,7 @@ fun EmojiPanel(
                                 .aspectRatio(1f)
                                 .clip(RoundedCornerShape(6.dp))
                                 .clickable {
-                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    HapticFeedbackHelper.performTap(haptic)
                                     onEmojiSelect(emoji)
                                 },
                             contentAlignment = Alignment.Center
@@ -162,7 +163,7 @@ fun EmojiPanel(
                             .shadow(if (isSelected) 1.dp else 0.dp, RoundedCornerShape(8.dp))
                             .clip(RoundedCornerShape(8.dp))
                             .clickable {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                HapticFeedbackHelper.performTap(haptic)
                                 var targetIndex = 0
                                 for (i in 0 until index) {
                                     targetIndex += 1 + categories[i].emojis.size
@@ -195,7 +196,7 @@ fun EmojiPanel(
                     .pointerInput(Unit) {
                         detectTapGestures(
                             onPress = {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                HapticFeedbackHelper.performTap(haptic)
                                 val repeatJob = coroutineScope.launchRepeatAction {
                                     onDelete()
                                 }

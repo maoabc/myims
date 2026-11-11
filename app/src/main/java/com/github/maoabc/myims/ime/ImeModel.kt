@@ -41,6 +41,7 @@ data class ImeUiState(
     val fullShape: Boolean = false,
     val tradition: Boolean = false,
     val emoji: Boolean = true,
+    val vibrationEnabled: Boolean = true,
     val bottomInsetDp: Int = 0,
     val imeOptions: Int = EditorInfo.IME_ACTION_UNSPECIFIED,
     val languageLabel: String = "en"
