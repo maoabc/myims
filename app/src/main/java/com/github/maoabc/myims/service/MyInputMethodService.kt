@@ -97,7 +97,6 @@ class MyInputMethodService : InputMethodService(),
     private suspend inline fun <T> withRimeContext(
         crossinline block: suspend CoroutineScope.(RimeSession) -> T
     ): T = withContext(rimeDispatcher) {
-        RimeManager.ensureInitialized(applicationContext)
         val session = rimeSessionInstance ?: createSession().apply {
             val options = KeyboardPreferencesManager.loadOptions(applicationContext)
             options?.let {

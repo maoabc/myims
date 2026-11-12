@@ -48,6 +48,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.github.maoabc.librime.RimeCandidate
+import com.github.maoabc.myims.ime.HapticFeedbackHelper
 import com.github.maoabc.myims.ime.KeyData
 import com.github.maoabc.myims.ime.KeyType
 import com.github.maoabc.myims.ui.theme.LocalKeyboardColors
@@ -171,7 +172,7 @@ fun ExpandedCandidatesPanel(
                         .pointerInput(Unit) {
                             detectTapGestures(
                                 onPress = {
-                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    HapticFeedbackHelper.performTap(haptic)
                                     val repeatJob = coroutineScope.launchRepeatAction {
                                         coroutineScope.launch {
                                             gridState.animateScrollBy(-scrollAmount())
@@ -206,7 +207,7 @@ fun ExpandedCandidatesPanel(
                         .pointerInput(Unit) {
                             detectTapGestures(
                                 onPress = {
-                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    HapticFeedbackHelper.performTap(haptic)
                                     val repeatJob = coroutineScope.launchRepeatAction {
                                         coroutineScope.launch {
                                             gridState.animateScrollBy(scrollAmount())
@@ -241,7 +242,7 @@ fun ExpandedCandidatesPanel(
                         .pointerInput(Unit) {
                             detectTapGestures(
                                 onPress = {
-                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    HapticFeedbackHelper.performTap(haptic)
                                     val repeatJob = coroutineScope.launchRepeatAction {
                                         onKeyClick(deleteKeyData)
                                     }
@@ -273,7 +274,7 @@ fun ExpandedCandidatesPanel(
                         .clip(RoundedCornerShape(8.dp))
                         .background(keyboardColors.keyPrimaryActionBackground)
                         .clickable {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            HapticFeedbackHelper.performTap(haptic)
                             onKeyClick(KeyData(KeyType.ENTER, "Enter"))
                         },
                     contentAlignment = Alignment.Center
