@@ -1,21 +1,33 @@
 package com.github.maoabc.myims.service
 
 import android.content.Intent
+import android.content.res.Configuration
+import android.hardware.input.InputManager
 import android.inputmethodservice.InputMethodService
 import android.os.Build
 import android.os.SystemClock.uptimeMillis
+import android.util.Log
 import android.view.KeyEvent
 import android.view.View
+import android.view.inputmethod.CursorAnchorInfo
 import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputConnection
 import android.view.inputmethod.InputMethodManager
 import android.view.inputmethod.InputMethodSubtype
 import androidx.collection.MutableObjectList
 import androidx.collection.ObjectList
+import androidx.collection.emptyObjectList
 import androidx.collection.mutableObjectListOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntRect
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.window.PopupPositionProvider
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -40,13 +52,14 @@ import com.github.maoabc.myims.ime.KeyData
 import com.github.maoabc.myims.ime.KeyType
 import com.github.maoabc.myims.ime.RimeOptions
 import com.github.maoabc.myims.ime.ShiftState
-import com.github.maoabc.myims.ui.keyboard.GboardKeyboard
 import com.github.maoabc.myims.ui.keyboard.TextMoveActions
 import com.github.maoabc.myims.ui.keyboard.TextMoveCommand
 import androidx.lifecycle.lifecycleScope
 import com.github.maoabc.librime.RimeAPI
 import com.github.maoabc.myims.ime.KeyboardMode
 import com.github.maoabc.myims.ime.RimeManager
+import com.github.maoabc.myims.ui.keyboard.HardOrSoftKeyboard
+import com.github.maoabc.myims.ui.theme.GboardTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asCoroutineDispatcher
@@ -76,6 +89,7 @@ class MyInputMethodService : InputMethodService(),
         get() = store
 
     private var uiState by mutableStateOf(ImeUiState())
+    private var cursorLocation by mutableStateOf<IntOffset?>(null)
 
     private val rimeDispatcher = Executors.newSingleThreadExecutor { r ->
         Thread(r, "RimeWorker")
@@ -125,12 +139,18 @@ class MyInputMethodService : InputMethodService(),
                     keyboardMode = KeyboardMode.QWERTY,
                     options = options,
                     composingText = "",
-                    candidates = mutableObjectListOf(),
+                    candidates = emptyObjectList(),
                     isCandidatesExpanded = false
                 )
             }
         }
     }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        println("rime: hard ${newConfig.hardKeyboardHidden}")
+    }
+
 
     override fun onCreateInputView(): View {
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_START)
@@ -138,12 +158,13 @@ class MyInputMethodService : InputMethodService(),
 
         uiState = uiState.copy(keyboardMode = KeyboardMode.QWERTY)
 
+
         window?.window?.let { window ->
             WindowCompat.setDecorFitsSystemWindows(window, false)
             val decorView = window.decorView
-            decorView.setViewTreeLifecycleOwner(this)
-            decorView.setViewTreeSavedStateRegistryOwner(this)
-            decorView.setViewTreeViewModelStoreOwner(this)
+            decorView.setViewTreeLifecycleOwner(this@MyInputMethodService)
+            decorView.setViewTreeSavedStateRegistryOwner(this@MyInputMethodService)
+            decorView.setViewTreeViewModelStoreOwner(this@MyInputMethodService)
 
             ViewCompat.setOnApplyWindowInsetsListener(decorView) { _, insets ->
                 val sysBars = insets.getInsets(
@@ -152,23 +173,46 @@ class MyInputMethodService : InputMethodService(),
                 val density = resources.displayMetrics.density
                 val bottomDp = (sysBars.bottom / density).toInt()
 
-                // Reserve bottom padding for system IME switcher bar / gesture navigation handle
-                val finalBottomPadding = if (bottomDp > 0) maxOf(bottomDp, 48) else 48
-
-                uiState = uiState.copy(bottomInsetDp = finalBottomPadding)
+                uiState = uiState.copy(bottomInsetDp = maxOf(bottomDp, 48))
                 insets
             }
+            val isDark =
+                (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+            WindowCompat.getInsetsController(window, decorView).isAppearanceLightNavigationBars =
+                !isDark
         }
+        val configuration = resources.configuration
+        println("rime: onCreateInputView ${configuration.hardKeyboardHidden}")
+
 
         return ComposeView(this).apply {
-            setViewTreeLifecycleOwner(this@MyInputMethodService)
-            setViewTreeSavedStateRegistryOwner(this@MyInputMethodService)
-            setViewTreeViewModelStoreOwner(this@MyInputMethodService)
             setContent {
-                GboardKeyboard(
-                    uiState = uiState,
-                    actionHandler = this@MyInputMethodService
-                )
+                val positionProvider = remember(cursorLocation) {
+                    val location = cursorLocation
+                    if (location != null) {
+                        object : PopupPositionProvider {
+                            override fun calculatePosition(
+                                anchorBounds: IntRect,
+                                windowSize: IntSize,
+                                layoutDirection: LayoutDirection,
+                                popupContentSize: IntSize
+                            ): IntOffset {
+                                val popupX = location.x - anchorBounds.left
+                                val popupY = location.y - anchorBounds.top
+                                Log.d(TAG, "calculatePosition: $popupX $popupY")
+                                return IntOffset(popupX, -popupY)
+                            }
+                        }
+                    } else null
+                }
+
+                GboardTheme {
+                    HardOrSoftKeyboard(
+                        uiState = uiState,
+                        actionHandler = this@MyInputMethodService,
+                        customPositionProvider = positionProvider
+                    )
+                }
             }
         }
     }
@@ -238,6 +282,11 @@ class MyInputMethodService : InputMethodService(),
         super.onStartInputView(info, restarting)
         val langTag = getCurrentSubtype()
 
+
+        val inputManager: InputManager = getSystemService(INPUT_SERVICE) as InputManager
+
+        Log.d(TAG, "onStartInputView: ${inputManager.inputDeviceIds.contentToString()}")
+
         if (lifecycleRegistry.currentState != Lifecycle.State.RESUMED) {
             lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_START)
             lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
@@ -253,13 +302,13 @@ class MyInputMethodService : InputMethodService(),
                 keyboardMode = KeyboardMode.QWERTY,
                 imeOptions = info?.imeOptions ?: EditorInfo.IME_ACTION_UNSPECIFIED,
                 composingText = "",
-                candidates = mutableObjectListOf(),
+                candidates = emptyObjectList(),
                 languageLabel = langTag,
                 options = options,
                 isCandidatesExpanded = false,
-                isMenuPanelOpen = false,
-                isEmojiPanelOpen = false,
-                isTextEditPanelOpen = false
+                isMenuOpen = false,
+                isEmojiOpen = false,
+                isTextEditOpen = false
             )
         }
     }
@@ -267,6 +316,8 @@ class MyInputMethodService : InputMethodService(),
     override fun onFinishInputView(finishingInput: Boolean) {
         super.onFinishInputView(finishingInput)
         commitOrClearComposing()
+
+        Log.d(TAG, "onFinishInputView: " + resources.configuration.hardKeyboardHidden)
 
         if (lifecycleRegistry.currentState.isAtLeast(Lifecycle.State.STARTED)) {
             lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
@@ -297,10 +348,32 @@ class MyInputMethodService : InputMethodService(),
         }
     }
 
-    //override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-    //    println("rime: onKeyDown $keyCode $event")
-    //    return super.onKeyDown(keyCode, event)
-    //}
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        Log.d(TAG, "onKeyDown: ${event?.isSystem}")
+        if (event?.isSystem == false) {
+            currentInputConnection?.requestCursorUpdates(
+                InputConnection.CURSOR_UPDATE_MONITOR or InputConnection.CURSOR_UPDATE_IMMEDIATE
+            )
+            launchWithMain {
+                val (rimeContext, commitText) = withRimeContext { rimeSession ->
+
+                    if (rimeSession.processKey(event.getUnicodeChar(), 0)) {
+                    }
+                    Pair(rimeSession.context, rimeSession.commitText)
+                }
+                uiState = uiState.copy(
+                    rimeContext = rimeContext,
+                    composingText = "",
+                    candidates = emptyObjectList()
+                )
+                if (commitText.isNotEmpty()) {
+                    currentInputConnection?.commitText(commitText, 1);
+                }
+            }
+            return true
+        }
+        return super.onKeyDown(keyCode, event)
+    }
 
     //override fun onKeyLongPress(keyCode: Int, event: KeyEvent?): Boolean {
     //    println("rime: onKeyLong $keyCode $event")
@@ -331,9 +404,21 @@ class MyInputMethodService : InputMethodService(),
     //    println("rime: onUpdateSelection $oldSelStart $oldSelEnd $newSelStart $newSelEnd")
     //}
 
-    //override fun onUpdateCursorAnchorInfo(cursorAnchorInfo: CursorAnchorInfo?) {
-    //    Log.d(TAG, "onUpdateCursorAnchorInfo: "+cursorAnchorInfo?.matrix)
-    //}
+    override fun onUpdateCursorAnchorInfo(cursorAnchorInfo: CursorAnchorInfo?) {
+        super.onUpdateCursorAnchorInfo(cursorAnchorInfo)
+        cursorAnchorInfo ?: return
+
+        val matrix = cursorAnchorInfo.matrix
+        val pts = floatArrayOf(
+            cursorAnchorInfo.insertionMarkerHorizontal,
+            cursorAnchorInfo.insertionMarkerBottom
+        )
+        matrix.mapPoints(pts)
+        val screenX = pts[0].toInt()
+        val screenY = pts[1].toInt()
+
+        cursorLocation = IntOffset(screenX, screenY)
+    }
 
 
     // --- ImeActionHandler Implementation ---
@@ -509,9 +594,9 @@ class MyInputMethodService : InputMethodService(),
 
     override fun onToggleEmojiPanel() {
         uiState = uiState.copy(
-            isEmojiPanelOpen = !uiState.isEmojiPanelOpen,
-            isMenuPanelOpen = false,
-            isTextEditPanelOpen = false,
+            isEmojiOpen = !uiState.isEmojiOpen,
+            isMenuOpen = false,
+            isTextEditOpen = false,
             isCandidatesExpanded = false
         )
     }
@@ -522,18 +607,18 @@ class MyInputMethodService : InputMethodService(),
 
     override fun onToggleTextEditPanel() {
         uiState = uiState.copy(
-            isTextEditPanelOpen = !uiState.isTextEditPanelOpen,
-            isEmojiPanelOpen = false,
-            isMenuPanelOpen = false,
+            isTextEditOpen = !uiState.isTextEditOpen,
+            isEmojiOpen = false,
+            isMenuOpen = false,
             isCandidatesExpanded = false
         )
     }
 
     override fun onToggleMenuPanel() {
         uiState = uiState.copy(
-            isMenuPanelOpen = !uiState.isMenuPanelOpen,
-            isEmojiPanelOpen = false,
-            isTextEditPanelOpen = false,
+            isMenuOpen = !uiState.isMenuOpen,
+            isEmojiOpen = false,
+            isTextEditOpen = false,
             isCandidatesExpanded = false
         )
     }
@@ -628,10 +713,16 @@ class MyInputMethodService : InputMethodService(),
         }
     }
 
-    override fun onCandidateSelect(candidate: RimeCandidate) {
+    override fun onCandidateSelect(canIdx: Int, pageIdx: Int) {
         launchWithMain {
             val (composingText, commitText, candidates) = withRimeContext { session ->
-                session.selectCandidate(candidate.index)
+
+                if (pageIdx != -1) {
+                    session.selectCandidateOnCurrentPage(canIdx)
+                } else {
+                    session.selectCandidate(canIdx)
+                }
+
                 val composingText = session.composingText
                 if (composingText.isNotEmpty()) {
                     RimeResult(
@@ -712,7 +803,7 @@ class MyInputMethodService : InputMethodService(),
     override fun onClearComposing() {
         uiState = uiState.copy(
             composingText = "",
-            candidates = mutableObjectListOf(),
+            candidates = emptyObjectList(),
             isCandidatesExpanded = false
         )
         currentInputConnection?.finishComposingText()

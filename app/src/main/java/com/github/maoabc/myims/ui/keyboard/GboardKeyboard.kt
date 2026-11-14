@@ -28,6 +28,7 @@ import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.PopupPositionProvider
 import com.github.maoabc.librime.RimeCandidate
 import com.github.maoabc.myims.ime.ImeActionHandler
 import com.github.maoabc.myims.ime.ImeUiState
@@ -39,183 +40,201 @@ import com.github.maoabc.myims.ime.KeyboardPanelType
 import com.github.maoabc.myims.ui.theme.GboardTheme
 import com.github.maoabc.myims.ui.theme.LocalKeyboardColors
 
+
+@Composable
+fun HardOrSoftKeyboard(
+    uiState: ImeUiState,
+    actionHandler: ImeActionHandler,
+    modifier: Modifier = Modifier,
+    customPositionProvider: PopupPositionProvider? = null
+) {
+    val rimeContext = uiState.rimeContext
+    if (rimeContext != null) {
+        FloatingCandidateWindow(
+            rimeContext = rimeContext,
+            onCandidateClick = { actionHandler.onCandidateSelect(it.index) },
+            customPositionProvider = customPositionProvider
+        )
+    } else {
+        GboardKeyboard(
+            uiState = uiState,
+            modifier = modifier,
+            actionHandler = actionHandler
+        )
+    }
+
+}
+
 @Composable
 fun GboardKeyboard(
     uiState: ImeUiState,
     actionHandler: ImeActionHandler,
     modifier: Modifier = Modifier
 ) {
-    GboardTheme {
-        val keyboardColors = LocalKeyboardColors.current
+    val keyboardColors = LocalKeyboardColors.current
 
-        Surface(
-            modifier = modifier
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .focusProperties { canFocus = false },
+        color = keyboardColors.keyboardBackground
+    ) {
+        var visibleCandidateCount by remember { mutableIntStateOf(0) }
+        val density = LocalDensity.current
+        val navInsetsBottomDp =
+            with(density) { WindowInsets.navigationBars.getBottom(this).toDp() }
+        val effectiveBottomPadding = maxOf(uiState.bottomInsetDp.dp, navInsetsBottomDp, 48.dp)
+
+        Column(
+            modifier = Modifier
                 .fillMaxWidth()
-                .focusProperties { canFocus = false },
-            color = keyboardColors.keyboardBackground
+                .padding(horizontal = 2.dp)
+                .padding(top = 2.dp, bottom = effectiveBottomPadding)
         ) {
-            var visibleCandidateCount by remember { mutableIntStateOf(0) }
-            val density = LocalDensity.current
-            val navInsetsBottomDp =
-                with(density) { WindowInsets.navigationBars.getBottom(this).toDp() }
-            val effectiveBottomPadding = maxOf(uiState.bottomInsetDp.dp, navInsetsBottomDp, 48.dp)
+            // Candidate / Tool bar at the top
+            CandidateBar(
+                uiState = uiState,
+                onCandidateClick = { candidate ->
+                    actionHandler.onCandidateSelect(candidate.index)
+                },
+                onToggleExpand = {
+                    actionHandler.onToggleCandidatesExpand()
+                },
+                onToggleEmojiPanel = {
+                    actionHandler.onToggleEmojiPanel()
+                },
+                onToggleTextEditPanel = {
+                    actionHandler.onToggleTextEditPanel()
+                },
+                onToggleMenuPanel = {
+                    actionHandler.onToggleMenuPanel()
+                },
+                onOpenAdvancedSettings = {
+                    actionHandler.onOpenAdvancedSettings()
+                },
+                onVisibleCountChanged = { count ->
+                    visibleCandidateCount = count
+                }
+            )
 
-            Column(
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Standard Keyboard Keys Layout / Dynamic Height Calculation
+            val rows = when (uiState.keyboardMode) {
+                KeyboardMode.QWERTY -> KeyboardLayouts.qwertyRows
+                KeyboardMode.NUMBERS -> KeyboardLayouts.numbersRows
+                KeyboardMode.SYMBOLS -> KeyboardLayouts.symbolsRows
+            }
+            val keyRowHeight = 60.dp
+            val totalKeysHeight = keyRowHeight * rows.size
+
+            AnimatedContent(
+                targetState = when {
+                    uiState.isTextEditOpen -> KeyboardPanelType.TEXT_EDIT
+                    uiState.isEmojiOpen -> KeyboardPanelType.EMOJI
+                    uiState.isMenuOpen -> KeyboardPanelType.MENU
+                    uiState.isCandidatesExpanded && uiState.candidates.isNotEmpty() -> KeyboardPanelType.EXPANDED_CANDIDATES
+                    else -> KeyboardPanelType.STANDARD
+                },
+                transitionSpec = {
+                    val aniDurationMillis = 150
+                    (slideInVertically(animationSpec = tween(aniDurationMillis)) { it / 2 } +
+                            fadeIn(animationSpec = tween(aniDurationMillis))) togetherWith
+                            (slideOutVertically(animationSpec = tween(aniDurationMillis)) { -it } +
+                                    fadeOut(animationSpec = tween(aniDurationMillis)))
+                },
+                label = "PanelAnimation",
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 2.dp)
-                    .padding(top = 2.dp, bottom = effectiveBottomPadding)
-            ) {
-                // Candidate / Tool bar at the top
-                CandidateBar(
-                    composingText = uiState.composingText,
-                    candidates = uiState.candidates,
-                    isExpanded = uiState.isCandidatesExpanded,
-                    onCandidateClick = { candidate ->
-                        actionHandler.onCandidateSelect(candidate)
-                    },
-                    onToggleExpand = {
-                        actionHandler.onToggleCandidatesExpand()
-                    },
-                    onToggleEmojiPanel = {
-                        actionHandler.onToggleEmojiPanel()
-                    },
-                    onToggleTextEditPanel = {
-                        actionHandler.onToggleTextEditPanel()
-                    },
-                    onToggleMenuPanel = {
-                        actionHandler.onToggleMenuPanel()
-                    },
-                    onOpenAdvancedSettings = {
-                        actionHandler.onOpenAdvancedSettings()
-                    },
-                    isTextEditOpen = uiState.isTextEditPanelOpen,
-                    isEmojiOpen = uiState.isEmojiPanelOpen,
-                    isMenuOpen = uiState.isMenuPanelOpen,
-                    onVisibleCountChanged = { count ->
-                        visibleCandidateCount = count
+                    .height(totalKeysHeight)
+            ) { panelType ->
+                when (panelType) {
+                    KeyboardPanelType.MENU -> {
+                        MenuPanel(
+                            options = uiState.options,
+                            onToggleOption = { option -> actionHandler.onToggleRimeOption(option) },
+                            modifier = Modifier.fillMaxSize()
+                        )
                     }
-                )
 
-                Spacer(modifier = Modifier.height(4.dp))
-
-                // Standard Keyboard Keys Layout / Dynamic Height Calculation
-                val rows = when (uiState.keyboardMode) {
-                    KeyboardMode.QWERTY -> KeyboardLayouts.qwertyRows
-                    KeyboardMode.NUMBERS -> KeyboardLayouts.numbersRows
-                    KeyboardMode.SYMBOLS -> KeyboardLayouts.symbolsRows
-                }
-                val keyRowHeight = 60.dp
-                val totalKeysHeight = keyRowHeight * rows.size
-
-                AnimatedContent(
-                    targetState = when {
-                        uiState.isTextEditPanelOpen -> KeyboardPanelType.TEXT_EDIT
-                        uiState.isEmojiPanelOpen -> KeyboardPanelType.EMOJI
-                        uiState.isMenuPanelOpen -> KeyboardPanelType.MENU
-                        uiState.isCandidatesExpanded && uiState.candidates.isNotEmpty() -> KeyboardPanelType.EXPANDED_CANDIDATES
-                        else -> KeyboardPanelType.STANDARD
-                    },
-                    transitionSpec = {
-                        val aniDurationMillis = 150
-                        (slideInVertically(animationSpec = tween(aniDurationMillis)) { it / 2 } +
-                                fadeIn(animationSpec = tween(aniDurationMillis))) togetherWith
-                                (slideOutVertically(animationSpec = tween(aniDurationMillis)) { -it } +
-                                        fadeOut(animationSpec = tween(aniDurationMillis)))
-                    },
-                    label = "PanelAnimation",
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(totalKeysHeight)
-                ) { panelType ->
-                    when (panelType) {
-                        KeyboardPanelType.MENU -> {
-                            MenuPanel(
-                                options = uiState.options,
-                                onToggleOption = { option -> actionHandler.onToggleRimeOption(option) },
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        }
-
-                        KeyboardPanelType.TEXT_EDIT -> {
-                            TextMovePanel(
-                                onAction = { command -> actionHandler.onTextEditCommand(command) },
-                                onDelete = {
-                                    actionHandler.onKeyClick(
-                                        KeyData(
-                                            KeyType.BACKSPACE,
-                                            "Del"
-                                        )
+                    KeyboardPanelType.TEXT_EDIT -> {
+                        TextMovePanel(
+                            onAction = { command -> actionHandler.onTextEditCommand(command) },
+                            onDelete = {
+                                actionHandler.onKeyClick(
+                                    KeyData(
+                                        KeyType.BACKSPACE,
+                                        "Del"
                                     )
-                                },
-                                isSelecting = uiState.isTextSelecting,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        }
+                                )
+                            },
+                            isSelecting = uiState.isTextSelecting,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
 
-                        KeyboardPanelType.EMOJI -> {
-                            EmojiPanel(
-                                onEmojiSelect = { emoji -> actionHandler.onEmojiSelect(emoji) },
-                                onDelete = {
-                                    actionHandler.onKeyClick(
-                                        KeyData(
-                                            KeyType.BACKSPACE,
-                                            "Del"
-                                        )
+                    KeyboardPanelType.EMOJI -> {
+                        EmojiPanel(
+                            onEmojiSelect = { emoji -> actionHandler.onEmojiSelect(emoji) },
+                            onDelete = {
+                                actionHandler.onKeyClick(
+                                    KeyData(
+                                        KeyType.BACKSPACE,
+                                        "Del"
                                     )
-                                },
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        }
+                                )
+                            },
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
 
-                        KeyboardPanelType.EXPANDED_CANDIDATES -> {
-                            // Expanded Candidates Grid Panel View
-                            val fromIndex =
-                                visibleCandidateCount.coerceIn(0, uiState.candidates.size)
-                            ExpandedCandidatesPanel(
-                                candidates = uiState.candidates,
-                                fromIndex = fromIndex,
-                                onCandidateClick = { candidate ->
-                                    actionHandler.onCandidateSelect(candidate)
-                                },
-                                onKeyClick = { keyData ->
-                                    actionHandler.onKeyClick(keyData)
-                                },
-                                onLoadMore = {
-                                    actionHandler.onLoadMoreCandidates()
-                                },
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        }
+                    KeyboardPanelType.EXPANDED_CANDIDATES -> {
+                        // Expanded Candidates Grid Panel View
+                        val fromIndex =
+                            visibleCandidateCount.coerceIn(0, uiState.candidates.size)
+                        ExpandedCandidatesPanel(
+                            candidates = uiState.candidates,
+                            fromIndex = fromIndex,
+                            onCandidateClick = { candidate ->
+                                actionHandler.onCandidateSelect(candidate.index)
+                            },
+                            onKeyClick = { keyData ->
+                                actionHandler.onKeyClick(keyData)
+                            },
+                            onLoadMore = {
+                                actionHandler.onLoadMoreCandidates()
+                            },
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
 
-                        KeyboardPanelType.STANDARD -> {
-                            // Standard Keyboard Keys Layout
-                            Column(modifier = Modifier.fillMaxSize()) {
-                                rows.forEach { rowKeys ->
-                                    val isNineLetterRow =
-                                        rowKeys.size == 9 && rowKeys.all { it.type == KeyType.CHARACTER }
-                                    val rowPadding = if (isNineLetterRow) 16.dp else 0.dp
+                    KeyboardPanelType.STANDARD -> {
+                        // Standard Keyboard Keys Layout
+                        Column(modifier = Modifier.fillMaxSize()) {
+                            rows.forEach { rowKeys ->
+                                val isNineLetterRow =
+                                    rowKeys.size == 9 && rowKeys.all { it.type == KeyType.CHARACTER }
+                                val rowPadding = if (isNineLetterRow) 16.dp else 0.dp
 
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(keyRowHeight)
-                                            .padding(horizontal = rowPadding)
-                                    ) {
-                                        rowKeys.forEach { keyData ->
-                                            KeyButton(
-                                                keyData = keyData,
-                                                shiftState = uiState.shiftState,
-                                                langLabel = uiState.languageLabel,
-                                                modifier = Modifier.weight(keyData.weight),
-                                                onKeyClick = { clickedKey ->
-                                                    actionHandler.onKeyClick(clickedKey)
-                                                },
-                                                onKeyLongPress = { longPressedKey ->
-                                                    actionHandler.onKeyLongPress(longPressedKey)
-                                                }
-                                            )
-                                        }
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(keyRowHeight)
+                                        .padding(horizontal = rowPadding)
+                                ) {
+                                    rowKeys.forEach { keyData ->
+                                        KeyButton(
+                                            keyData = keyData,
+                                            shiftState = uiState.shiftState,
+                                            langLabel = uiState.languageLabel,
+                                            modifier = Modifier.weight(keyData.weight),
+                                            onKeyClick = { clickedKey ->
+                                                actionHandler.onKeyClick(clickedKey)
+                                            },
+                                            onKeyLongPress = { longPressedKey ->
+                                                actionHandler.onKeyLongPress(longPressedKey)
+                                            }
+                                        )
                                     }
                                 }
                             }
@@ -236,16 +255,22 @@ fun GboardKeyboardPreview() {
                 composingText = "hello",
                 languageLabel = "en",
                 candidates = mutableObjectListOf(
-                    RimeCandidate("hello"), RimeCandidate("help"), RimeCandidate("hell"),
-                    RimeCandidate("world"), RimeCandidate("work"), RimeCandidate("word"),
-                    RimeCandidate("code"), RimeCandidate("compose"), RimeCandidate("core")
+                    RimeCandidate.forTest("hello"),
+                    RimeCandidate.forTest("help"),
+                    RimeCandidate.forTest("hell"),
+                    RimeCandidate.forTest("world"),
+                    RimeCandidate.forTest("work"),
+                    RimeCandidate.forTest("word"),
+                    RimeCandidate.forTest("code"),
+                    RimeCandidate.forTest("compose"),
+                    RimeCandidate.forTest("core")
                 ),
                 isCandidatesExpanded = false
             ),
             actionHandler = object : ImeActionHandler {
                 override fun onKeyClick(keyData: KeyData) {}
                 override fun onKeyLongPress(keyData: KeyData) {}
-                override fun onCandidateSelect(candidate: RimeCandidate) {}
+                override fun onCandidateSelect(canIdx: Int, pageIdx: Int) {}
                 override fun onToggleCandidatesExpand() {}
                 override fun onLanguageSwitch() {}
                 override fun onClearComposing() {}

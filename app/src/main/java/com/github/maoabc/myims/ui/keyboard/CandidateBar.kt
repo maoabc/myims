@@ -1,13 +1,11 @@
 package com.github.maoabc.myims.ui.keyboard
 
-import androidx.collection.ObjectList
 import androidx.collection.mutableObjectListOf
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -55,6 +53,7 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import com.github.maoabc.librime.RimeCandidate
+import com.github.maoabc.myims.ime.ImeUiState
 import com.github.maoabc.myims.ui.theme.GboardTheme
 import com.github.maoabc.myims.ui.theme.LocalKeyboardColors
 
@@ -102,15 +101,17 @@ fun TextEditIcon(modifier: Modifier = Modifier, tint: Color = LocalContentColor.
             moveTo(width * 0.85f, height * 0.5f)
             lineTo(width * 0.7f, height * 0.68f)
         }
-        drawPath(pathRight, color = tint, style = Stroke(width = strokeWidth, cap = StrokeCap.Round))
+        drawPath(
+            pathRight,
+            color = tint,
+            style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+        )
     }
 }
 
 @Composable
 fun CandidateBar(
-    composingText: String,
-    candidates: ObjectList<RimeCandidate>,
-    isExpanded: Boolean,
+    uiState: ImeUiState,
     onCandidateClick: (RimeCandidate) -> Unit,
     onToggleExpand: () -> Unit,
     modifier: Modifier = Modifier,
@@ -119,11 +120,11 @@ fun CandidateBar(
     onToggleTextEditPanel: () -> Unit = {},
     onToggleMenuPanel: () -> Unit = {},
     onOpenAdvancedSettings: () -> Unit = {},
-    isTextEditOpen: Boolean = false,
-    isEmojiOpen: Boolean = false,
-    isMenuOpen: Boolean = false,
     onVisibleCountChanged: (Int) -> Unit = {},
 ) {
+    val composingText = uiState.composingText
+    val candidates = uiState.candidates
+    val isExpanded = uiState.isCandidatesExpanded
     val keyboardColors = LocalKeyboardColors.current
     var renderedCount by remember { mutableIntStateOf(candidates.size) }
 
@@ -136,7 +137,7 @@ fun CandidateBar(
             .fillMaxWidth()
             .height(36.dp)
     ) {
-        if (isTextEditOpen) {
+        if (uiState.isTextEditOpen) {
             // Text Edit Mode Header in CandidateBar: Left arrow + Title "文本编辑"
             Row(
                 modifier = Modifier
@@ -157,7 +158,7 @@ fun CandidateBar(
                     )
                 }
             }
-        } else if (isEmojiOpen) {
+        } else if (uiState.isEmojiOpen) {
             // Emoji Mode Header in CandidateBar: Left arrow + Title "表情"
             Row(
                 modifier = Modifier
@@ -178,7 +179,7 @@ fun CandidateBar(
                     )
                 }
             }
-        } else if (isMenuOpen) {
+        } else if (uiState.isMenuOpen) {
             // Menu Mode Header in CandidateBar: Left arrow + Title "菜单" + Right Settings button
             Row(
                 modifier = Modifier
@@ -396,15 +397,21 @@ fun CandidateBar(
 @Composable
 fun CandidateBarPreview() {
     GboardTheme {
-        Box(modifier = Modifier.fillMaxWidth().height(36.dp)) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(36.dp)
+        ) {
             CandidateBar(
-                composingText = "",
-                candidates = mutableObjectListOf(
-                    RimeCandidate("hello"),
-                    RimeCandidate("world"),
-                    RimeCandidate("compose")
+                ImeUiState(
+                    composingText = "hh",
+                    candidates = mutableObjectListOf(
+                        RimeCandidate.forTest("hello"),
+                        RimeCandidate.forTest("world"),
+                        RimeCandidate.forTest("compose")
+                    ),
+                    isCandidatesExpanded = false,
                 ),
-                isExpanded = false,
                 onCandidateClick = {},
                 onToggleExpand = {}
             )
@@ -416,11 +423,16 @@ fun CandidateBarPreview() {
 @Composable
 fun CandidateBarToolbarPreview() {
     GboardTheme {
-        Box(modifier = Modifier.fillMaxWidth().height(36.dp)) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(36.dp)
+        ) {
             CandidateBar(
-                composingText = "",
-                candidates = mutableObjectListOf(),
-                isExpanded = false,
+                ImeUiState(
+                    composingText = "",
+                    candidates = mutableObjectListOf(),
+                ),
                 onCandidateClick = {},
                 onToggleExpand = {}
             )
@@ -432,14 +444,19 @@ fun CandidateBarToolbarPreview() {
 @Composable
 fun CandidateBarTextEditPreview() {
     GboardTheme {
-        Box(modifier = Modifier.fillMaxWidth().height(36.dp)) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(36.dp)
+        ) {
             CandidateBar(
-                composingText = "",
-                candidates = mutableObjectListOf(),
-                isExpanded = false,
+                ImeUiState(
+                    composingText = "",
+                    candidates = mutableObjectListOf(),
+                    isTextEditOpen = true
+                ),
                 onCandidateClick = {},
                 onToggleExpand = {},
-                isTextEditOpen = true
             )
         }
     }
@@ -449,14 +466,19 @@ fun CandidateBarTextEditPreview() {
 @Composable
 fun CandidateBarEmojiPreview() {
     GboardTheme {
-        Box(modifier = Modifier.fillMaxWidth().height(36.dp)) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(36.dp)
+        ) {
             CandidateBar(
-                composingText = "",
-                candidates = mutableObjectListOf(),
-                isExpanded = false,
+                ImeUiState(
+                    composingText = "",
+                    candidates = mutableObjectListOf(),
+                    isEmojiOpen = true
+                ),
                 onCandidateClick = {},
                 onToggleExpand = {},
-                isEmojiOpen = true
             )
         }
     }
@@ -466,14 +488,19 @@ fun CandidateBarEmojiPreview() {
 @Composable
 fun CandidateBarMenuPreview() {
     GboardTheme {
-        Box(modifier = Modifier.fillMaxWidth().height(36.dp)) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(36.dp)
+        ) {
             CandidateBar(
-                composingText = "",
-                candidates = mutableObjectListOf(),
-                isExpanded = false,
+                ImeUiState(
+                    composingText = "",
+                    candidates = mutableObjectListOf(),
+                    isMenuOpen = true
+                ),
                 onCandidateClick = {},
                 onToggleExpand = {},
-                isMenuOpen = true
             )
         }
     }
