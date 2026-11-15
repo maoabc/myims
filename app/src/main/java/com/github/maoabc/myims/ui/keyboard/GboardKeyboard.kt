@@ -50,11 +50,14 @@ fun HardOrSoftKeyboard(
 ) {
     val rimeContext = uiState.rimeContext
     if (rimeContext != null) {
-        FloatingCandidateWindow(
-            rimeContext = rimeContext,
-            onCandidateClick = { actionHandler.onCandidateSelect(it.index) },
-            customPositionProvider = customPositionProvider
-        )
+        if (rimeContext.composition.preedit.isNotEmpty()) {
+            FloatingCandidateWindow(
+                rimeContext = rimeContext,
+                onCandidateClick = { actionHandler.onCandidateSelect(it.index) },
+                onPageChange = { actionHandler.onPageChange(it) },
+                customPositionProvider = customPositionProvider
+            )
+        }
     } else {
         GboardKeyboard(
             uiState = uiState,

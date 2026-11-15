@@ -9,6 +9,7 @@ interface ImeActionHandler {
     fun onToggleCandidatesExpand()
     fun onLanguageSwitch()
     fun onClearComposing()
+    fun onPageChange(backward: Boolean) {}
     fun onLoadMoreCandidates() {}
     fun onToggleEmojiPanel() {}
     fun onEmojiSelect(emoji: String) {}

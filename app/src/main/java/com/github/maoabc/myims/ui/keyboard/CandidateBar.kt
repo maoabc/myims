@@ -250,7 +250,7 @@ fun CandidateBar(
                                     maxLines = 1
                                 )
 
-                                CandidateContextMenu(
+                                CandidateManagerMenu(
                                     candidate = candidate,
                                     expanded = showMenu,
                                     onDismissRequest = { showMenu = false },

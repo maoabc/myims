@@ -2,12 +2,8 @@ package com.github.maoabc.myims.ui.keyboard
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -18,7 +14,7 @@ import androidx.compose.ui.window.PopupProperties
 import com.github.maoabc.librime.RimeCandidate
 
 @Composable
-fun CandidateContextMenu(
+fun CandidateManagerMenu(
     candidate: RimeCandidate,
     expanded: Boolean,
     onDismissRequest: () -> Unit,

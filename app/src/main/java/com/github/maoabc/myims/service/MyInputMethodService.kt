@@ -185,7 +185,8 @@ class MyInputMethodService : InputMethodService(),
         println("rime: onCreateInputView ${configuration.hardKeyboardHidden}")
 
 
-        return ComposeView(this).apply {
+        val composeView = ComposeView(this)
+        return composeView.apply {
             setContent {
                 val positionProvider = remember(cursorLocation) {
                     val location = cursorLocation
@@ -197,10 +198,20 @@ class MyInputMethodService : InputMethodService(),
                                 layoutDirection: LayoutDirection,
                                 popupContentSize: IntSize
                             ): IntOffset {
-                                val popupX = location.x - anchorBounds.left
-                                val popupY = location.y - anchorBounds.top
-                                Log.d(TAG, "calculatePosition: $popupX $popupY")
-                                return IntOffset(popupX, -popupY)
+                                val viewLocation = IntArray(2)
+                                composeView.getLocationOnScreen(viewLocation)
+                                val viewScreenX = viewLocation[0]
+                                val viewScreenY = viewLocation[1]
+
+                                var popupX = location.x - viewScreenX
+                                val popupY = location.y - viewScreenY
+
+                                if (popupX + popupContentSize.width > windowSize.width) {
+                                    popupX = windowSize.width - popupContentSize.width
+                                }
+                                popupX = popupX.coerceAtLeast(0)
+
+                                return IntOffset(popupX, popupY)
                             }
                         }
                     } else null
@@ -354,13 +365,26 @@ class MyInputMethodService : InputMethodService(),
             currentInputConnection?.requestCursorUpdates(
                 InputConnection.CURSOR_UPDATE_MONITOR or InputConnection.CURSOR_UPDATE_IMMEDIATE
             )
+            val x11Key = when (event.keyCode) {
+                KeyEvent.KEYCODE_DPAD_LEFT -> 0xff51
+                KeyEvent.KEYCODE_DPAD_RIGHT -> 0xff53
+                KeyEvent.KEYCODE_DPAD_UP -> 0xff52
+                KeyEvent.KEYCODE_DPAD_DOWN -> 0xff54
+                KeyEvent.KEYCODE_DEL -> 0xff08
+                KeyEvent.KEYCODE_ENTER -> 0xff0d
+                else -> {
+                    -1
+                }
+            }
             launchWithMain {
                 val (rimeContext, commitText) = withRimeContext { rimeSession ->
 
-                    if (rimeSession.processKey(event.getUnicodeChar(), 0)) {
+                    val keycode = event.unicodeChar
+                    if (rimeSession.processKey(if (x11Key > 0) x11Key else keycode, 0)) {
                     }
                     Pair(rimeSession.context, rimeSession.commitText)
                 }
+                Log.d(TAG, "onKeyDown: $x11Key " + rimeContext)
                 uiState = uiState.copy(
                     rimeContext = rimeContext,
                     composingText = "",
@@ -709,6 +733,21 @@ class MyInputMethodService : InputMethodService(),
                 if (uiState.isTextSelecting) {
                     uiState = uiState.copy(isTextSelecting = false)
                 }
+            }
+        }
+    }
+
+    override fun onPageChange(backward: Boolean) {
+        launchWithMain {
+            val (rimeContext, commitText) = withRimeContext { session ->
+                session.changePage(backward)
+                Pair(session.context, session.commitText)
+            }
+            uiState = uiState.copy(
+                rimeContext = rimeContext
+            )
+            if (commitText.isNotEmpty()) {
+                currentInputConnection?.commitText(commitText, 1)
             }
         }
     }
