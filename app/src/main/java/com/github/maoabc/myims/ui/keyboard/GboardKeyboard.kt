@@ -46,7 +46,7 @@ fun HardOrSoftKeyboard(
     uiState: ImeUiState,
     actionHandler: ImeActionHandler,
     modifier: Modifier = Modifier,
-    customPositionProvider: PopupPositionProvider? = null
+    positionProvider: PopupPositionProvider
 ) {
     val rimeContext = uiState.rimeContext
     if (rimeContext != null) {
@@ -55,7 +55,7 @@ fun HardOrSoftKeyboard(
                 rimeContext = rimeContext,
                 onCandidateClick = { actionHandler.onCandidateSelect(it.index) },
                 onPageChange = { actionHandler.onPageChange(it) },
-                customPositionProvider = customPositionProvider
+                positionProvider = positionProvider
             )
         }
     } else {

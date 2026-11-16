@@ -19,7 +19,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
@@ -27,10 +26,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.IntRect
-import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
@@ -48,7 +43,7 @@ import com.github.maoabc.myims.ui.theme.LocalKeyboardColors
  * @param modifier 修饰符
  * @param onCandidateClick 点击候选词时的回调
  * @param onPageChange 点击换页三角箭头时的回调 (backward: true 为上一页, false 为下一页)
- * @param customPositionProvider 自定义的 PopupPositionProvider，外部提供位置计算
+ * @param positionProvider 自定义的 PopupPositionProvider，外部提供位置计算
  */
 @Composable
 fun FloatingCandidateWindow(
@@ -56,22 +51,8 @@ fun FloatingCandidateWindow(
     modifier: Modifier = Modifier,
     onCandidateClick: (RimeCandidate) -> Unit,
     onPageChange: (Boolean) -> Unit = {},
-    customPositionProvider: PopupPositionProvider? = null
+    positionProvider: PopupPositionProvider
 ) {
-    val defaultPositionProvider = remember {
-        object : PopupPositionProvider {
-            override fun calculatePosition(
-                anchorBounds: IntRect,
-                windowSize: IntSize,
-                layoutDirection: LayoutDirection,
-                popupContentSize: IntSize
-            ): IntOffset {
-                return IntOffset.Zero
-            }
-        }
-    }
-    val positionProvider = customPositionProvider ?: defaultPositionProvider
-
     Popup(
         popupPositionProvider = positionProvider,
         properties = PopupProperties(
@@ -87,6 +68,7 @@ fun FloatingCandidateWindow(
             onPageChange = onPageChange,
             modifier = modifier,
         )
+
     }
 }
 
@@ -158,7 +140,8 @@ fun FloatingCandidateContent(
                     modifier = Modifier.wrapContentSize()
                 ) {
                     val pageSize = rimeContext.menu.page_size
-                    val displayCount = if (pageSize > 0) candidates.size.coerceAtMost(pageSize) else candidates.size
+                    val displayCount =
+                        if (pageSize > 0) candidates.size.coerceAtMost(pageSize) else candidates.size
                     val highlightedIndex = rimeContext.menu.highlighted_candidate_index.coerceIn(
                         0,
                         (displayCount - 1).coerceAtLeast(0)
@@ -166,8 +149,8 @@ fun FloatingCandidateContent(
 
                     val lazyListState = rememberLazyListState()
 
-                    // 高亮索引改变时，自动滑动聚焦到高亮候选词
-                    LaunchedEffect(highlightedIndex) {
+                    // 高亮索引或候选词列表变化时，自动平滑滚动保证高亮候选词 100% 可见
+                    LaunchedEffect(highlightedIndex, candidates.firstOrNull()?.text) {
                         if (displayCount > 0 && highlightedIndex in 0 until displayCount) {
                             lazyListState.animateScrollToItem(highlightedIndex)
                         }
@@ -205,11 +188,12 @@ fun FloatingCandidateContent(
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     // 序号依据 select_keys，若为空则默认使用序号 1. 2. 3.
                                     val selectKeys = rimeContext.menu.select_keys
-                                    val label = if (selectKeys.isNotEmpty() && i < selectKeys.size) {
-                                        "${selectKeys[i]}."
-                                    } else {
-                                        "${i + 1}."
-                                    }
+                                    val label =
+                                        if (selectKeys.isNotEmpty() && i < selectKeys.size) {
+                                            "${selectKeys[i]}."
+                                        } else {
+                                            "${i + 1}."
+                                        }
 
                                     Text(
                                         text = label,

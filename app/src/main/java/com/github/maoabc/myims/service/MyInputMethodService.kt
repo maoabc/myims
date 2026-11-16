@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
@@ -188,40 +189,44 @@ class MyInputMethodService : InputMethodService(),
         val composeView = ComposeView(this)
         return composeView.apply {
             setContent {
-                val positionProvider = remember(cursorLocation) {
-                    val location = cursorLocation
-                    if (location != null) {
-                        object : PopupPositionProvider {
-                            override fun calculatePosition(
-                                anchorBounds: IntRect,
-                                windowSize: IntSize,
-                                layoutDirection: LayoutDirection,
-                                popupContentSize: IntSize
-                            ): IntOffset {
-                                val viewLocation = IntArray(2)
-                                composeView.getLocationOnScreen(viewLocation)
-                                val viewScreenX = viewLocation[0]
-                                val viewScreenY = viewLocation[1]
 
-                                var popupX = location.x - viewScreenX
-                                val popupY = location.y - viewScreenY
+                val positionProvider = object : PopupPositionProvider {
+                    override fun calculatePosition(
+                        anchorBounds: IntRect,
+                        windowSize: IntSize,
+                        layoutDirection: LayoutDirection,
+                        popupContentSize: IntSize
+                    ): IntOffset {
+                        val location = cursorLocation
+                        return if (location != null) {
+                            val viewLocation = IntArray(2)
+                            composeView.getLocationOnScreen(viewLocation)
+                            val viewScreenX = viewLocation[0]
+                            val viewScreenY = viewLocation[1]
 
-                                if (popupX + popupContentSize.width > windowSize.width) {
-                                    popupX = windowSize.width - popupContentSize.width
-                                }
-                                popupX = popupX.coerceAtLeast(0)
+                            var popupX = location.x - viewScreenX
+                            val popupY = location.y - viewScreenY
 
-                                return IntOffset(popupX, popupY)
+                            if (popupX + popupContentSize.width > windowSize.width) {
+                                popupX = windowSize.width - popupContentSize.width
                             }
+                            popupX = popupX.coerceAtLeast(0)
+
+                            IntOffset(popupX, popupY)
+                        } else {
+                            // 文本编辑器不支持坐标获取时（cursorLocation == null），悬浮窗口刚好放在左下角（避开底部导航栏 insets）
+                            val popupX = -anchorBounds.left
+                            val popupY = -popupContentSize.height
+                            IntOffset(popupX, popupY)
                         }
-                    } else null
+                    }
                 }
 
                 GboardTheme {
                     HardOrSoftKeyboard(
                         uiState = uiState,
                         actionHandler = this@MyInputMethodService,
-                        customPositionProvider = positionProvider
+                        positionProvider = positionProvider
                     )
                 }
             }
@@ -384,7 +389,7 @@ class MyInputMethodService : InputMethodService(),
                     }
                     Pair(rimeSession.context, rimeSession.commitText)
                 }
-                Log.d(TAG, "onKeyDown: $x11Key " + rimeContext)
+                Log.d(TAG, "onKeyDown: $x11Key $rimeContext")
                 uiState = uiState.copy(
                     rimeContext = rimeContext,
                     composingText = "",
@@ -774,7 +779,11 @@ class MyInputMethodService : InputMethodService(),
                     RimeResult("", session.commitText, mutableObjectListOf())
                 }
             }
-            if (composingText.isNotEmpty()) {
+            if (pageIdx != -1) {
+                uiState = uiState.copy(
+                    rimeContext = null
+                )
+            } else if (composingText.isNotEmpty()) {
                 uiState = uiState.copy(
                     composingText = composingText,
                     candidates = candidates
