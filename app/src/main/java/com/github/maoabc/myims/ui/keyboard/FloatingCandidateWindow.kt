@@ -12,10 +12,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,7 +49,6 @@ import com.github.maoabc.myims.ui.theme.LocalKeyboardColors
  * @param onCandidateClick 点击候选词时的回调
  * @param onPageChange 点击换页三角箭头时的回调 (backward: true 为上一页, false 为下一页)
  * @param customPositionProvider 自定义的 PopupPositionProvider，外部提供位置计算
- * @param maxDisplayedCandidates 悬浮窗单页最多显示的候选词数量 (默认 5)
  */
 @Composable
 fun FloatingCandidateWindow(
@@ -54,8 +56,7 @@ fun FloatingCandidateWindow(
     modifier: Modifier = Modifier,
     onCandidateClick: (RimeCandidate) -> Unit,
     onPageChange: (Boolean) -> Unit = {},
-    customPositionProvider: PopupPositionProvider? = null,
-    maxDisplayedCandidates: Int = 5
+    customPositionProvider: PopupPositionProvider? = null
 ) {
     val defaultPositionProvider = remember {
         object : PopupPositionProvider {
@@ -85,21 +86,19 @@ fun FloatingCandidateWindow(
             onCandidateClick = onCandidateClick,
             onPageChange = onPageChange,
             modifier = modifier,
-            maxDisplayedCandidates = maxDisplayedCandidates,
         )
     }
 }
 
 /**
- * 悬浮窗的具体 UI 内容组件 (纯单行模式，自适应内容大小，方向按键 ◀ ▶ 绝对优先保留在右侧)
+ * 悬浮窗的具体 UI 内容组件 (支持手势左右滑动，且自动根据高亮索引平滑滚动到对应候选词)
  */
 @Composable
 fun FloatingCandidateContent(
     rimeContext: RimeContext,
     modifier: Modifier = Modifier,
     onCandidateClick: (RimeCandidate) -> Unit,
-    onPageChange: (Boolean) -> Unit = {},
-    maxDisplayedCandidates: Int = 5
+    onPageChange: (Boolean) -> Unit = {}
 ) {
     val keyboardColors = LocalKeyboardColors.current
     val shape = RoundedCornerShape(8.dp)
@@ -151,27 +150,44 @@ fun FloatingCandidateContent(
                 }
             }
 
-            // 2. 候选词纯单行展示 (1.说明  2.说明书  3.明确 ... ◀ ▶)
+            // 2. 候选词单行展示，支持左右滑动 & 根据高亮索引自动跟随滚动 (1.说明  2.说明书  3.明确 ... ◀ ▶)
             if (candidates.isNotEmpty()) {
                 Row(
                     horizontalArrangement = Arrangement.Start,
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.wrapContentSize()
                 ) {
-                    val displayCount = candidates.size.coerceAtMost(maxDisplayedCandidates)
+                    val pageSize = rimeContext.menu.page_size
+                    val displayCount = if (pageSize > 0) candidates.size.coerceAtMost(pageSize) else candidates.size
+                    val highlightedIndex = rimeContext.menu.highlighted_candidate_index.coerceIn(
+                        0,
+                        (displayCount - 1).coerceAtLeast(0)
+                    )
 
-                    // 候选词列表使用 weight(1f, fill = false)
-                    // 当内容短时不撑大全屏；当内容超出屏宽时优先压缩候选词，绝对不挤占右侧 ◀ ▶
-                    Row(
+                    val lazyListState = rememberLazyListState()
+
+                    // 高亮索引改变时，自动滑动聚焦到高亮候选词
+                    LaunchedEffect(highlightedIndex) {
+                        if (displayCount > 0 && highlightedIndex in 0 until displayCount) {
+                            lazyListState.animateScrollToItem(highlightedIndex)
+                        }
+                    }
+
+                    // 候选词列表：使用 LazyRow + weight(1f, fill = false)，既可左右划动，又绝对不挤占右侧 ◀ ▶
+                    LazyRow(
+                        state = lazyListState,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Start,
                         modifier = Modifier
                             .weight(1f, fill = false)
                             .wrapContentSize()
                     ) {
-                        for (i in 0 until displayCount) {
+                        items(
+                            count = displayCount,
+                            key = { index -> candidates[index].text }
+                        ) { i ->
                             val candidate = candidates[i]
-                            val isSelected = (i == rimeContext.menu.highlighted_candidate_index)
+                            val isSelected = (i == highlightedIndex)
 
                             Box(
                                 modifier = Modifier
@@ -187,9 +203,16 @@ fun FloatingCandidateContent(
                                     .padding(horizontal = 5.dp, vertical = 2.dp)
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    // 序号 1. 2. 3.
+                                    // 序号依据 select_keys，若为空则默认使用序号 1. 2. 3.
+                                    val selectKeys = rimeContext.menu.select_keys
+                                    val label = if (selectKeys.isNotEmpty() && i < selectKeys.size) {
+                                        "${selectKeys[i]}."
+                                    } else {
+                                        "${i + 1}."
+                                    }
+
                                     Text(
-                                        text = "${i + 1}.",
+                                        text = label,
                                         fontSize = 13.sp,
                                         maxLines = 1,
                                         softWrap = false,
@@ -209,7 +232,6 @@ fun FloatingCandidateContent(
                                         fontSize = 16.sp,
                                         maxLines = 1,
                                         softWrap = false,
-                                        overflow = TextOverflow.Ellipsis,
                                         color = if (isSelected) {
                                             keyboardColors.candidateText
                                         } else {
@@ -219,14 +241,10 @@ fun FloatingCandidateContent(
                                     )
                                 }
                             }
-
-                            if (i < displayCount - 1) {
-                                Spacer(modifier = Modifier.width(4.dp))
-                            }
                         }
                     }
 
-                    // 结尾的左右小三角翻页按键 ◀ ▶ (无 weight，最高优先级保留在右侧，绝对不会被顶出)
+                    // 结尾的左右小三角翻页按键 ◀ ▶ (无 weight，最高优先级保留在右侧)
                     val menu = rimeContext.menu
                     val hasPrev = menu.page_no > 0
                     val hasNext = !menu.is_last_page
