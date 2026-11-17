@@ -65,6 +65,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.util.concurrent.Executors
 
@@ -110,18 +112,22 @@ class MyInputMethodService : InputMethodService(),
         return RimeAPI.createSession()
     }
 
+    private val rimeMutex = Mutex()
+
     private suspend inline fun <T> withRimeContext(
         crossinline block: suspend CoroutineScope.(RimeSession) -> T
-    ): T = withContext(rimeDispatcher) {
-        val session = rimeSessionInstance ?: createSession().apply {
-            val options = KeyboardPreferencesManager.loadOptions(applicationContext)
-            options?.let {
-                KeyboardPreferencesManager.applyToSession(this, options)
-            }
-            val langTag = getCurrentSubtype()
-            this.setOption(RimeOptions.ASCII_MODE, langTag.contains("en"))
-        }.also { rimeSessionInstance = it }
-        block(session)
+    ): T = rimeMutex.withLock {
+        withContext(rimeDispatcher) {
+            val session = rimeSessionInstance ?: createSession().apply {
+                val options = KeyboardPreferencesManager.loadOptions(applicationContext)
+                options?.let {
+                    KeyboardPreferencesManager.applyToSession(this, options)
+                }
+                val langTag = getCurrentSubtype()
+                this.setOption(RimeOptions.ASCII_MODE, langTag.contains("en"))
+            }.also { rimeSessionInstance = it }
+            block(session)
+        }
     }
 
     override fun onCreate() {
@@ -841,7 +847,11 @@ class MyInputMethodService : InputMethodService(),
     }
 
     override fun onClearComposing() {
-        uiState = ImeUiState()
+
+        uiState = ImeUiState(
+            languageLabel = uiState.languageLabel,
+            options = uiState.options,
+        )
         currentInputConnection?.finishComposingText()
     }
 
