@@ -20,14 +20,12 @@ import androidx.collection.emptyObjectList
 import androidx.collection.mutableObjectListOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
@@ -57,6 +55,8 @@ import com.github.maoabc.myims.ui.keyboard.TextMoveActions
 import com.github.maoabc.myims.ui.keyboard.TextMoveCommand
 import androidx.lifecycle.lifecycleScope
 import com.github.maoabc.librime.RimeAPI
+import com.github.maoabc.librime.RimeKeyMap
+import com.github.maoabc.librime.RimeKeyMap.NONE
 import com.github.maoabc.myims.ime.KeyboardMode
 import com.github.maoabc.myims.ime.RimeManager
 import com.github.maoabc.myims.ui.keyboard.HardOrSoftKeyboard
@@ -75,6 +75,7 @@ class MyInputMethodService : InputMethodService(),
     ImeActionHandler {
 
     private val TAG: String = "rime"
+    private val DEBUG: Boolean = false
 
     private val lifecycleRegistry = LifecycleRegistry(this)
     private val savedStateRegistryController = SavedStateRegistryController.create(this)
@@ -147,11 +148,6 @@ class MyInputMethodService : InputMethodService(),
         }
     }
 
-    override fun onConfigurationChanged(newConfig: Configuration) {
-        super.onConfigurationChanged(newConfig)
-        println("rime: hard ${newConfig.hardKeyboardHidden}")
-    }
-
 
     override fun onCreateInputView(): View {
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_START)
@@ -182,10 +178,6 @@ class MyInputMethodService : InputMethodService(),
             WindowCompat.getInsetsController(window, decorView).isAppearanceLightNavigationBars =
                 !isDark
         }
-        val configuration = resources.configuration
-        println("rime: onCreateInputView ${configuration.hardKeyboardHidden}")
-
-
         val composeView = ComposeView(this)
         return composeView.apply {
             setContent {
@@ -205,12 +197,18 @@ class MyInputMethodService : InputMethodService(),
                             val viewScreenY = viewLocation[1]
 
                             var popupX = location.x - viewScreenX
-                            val popupY = location.y - viewScreenY
+                            var popupY = location.y - viewScreenY
 
                             if (popupX + popupContentSize.width > windowSize.width) {
                                 popupX = windowSize.width - popupContentSize.width
                             }
                             popupX = popupX.coerceAtLeast(0)
+
+                            // Y 轴下边界检查：如果悬浮窗底部会超出屏幕/窗口底部，则将其向上收拢贴紧屏幕底部
+                            val maxAllowedY = -popupContentSize.height
+                            if (popupY + popupContentSize.height > 0) {
+                                popupY = popupY.coerceAtMost(maxAllowedY)
+                            }
 
                             IntOffset(popupX, popupY)
                         } else {
@@ -247,12 +245,10 @@ class MyInputMethodService : InputMethodService(),
 
 
     //override fun onEvaluateInputViewShown(): Boolean {
-    //    println("rime: onEvaluate")
     //    return super.onEvaluateInputViewShown()
     //}
     //override fun onConfigurationChanged(newConfig: Configuration) {
     //    super.onConfigurationChanged(newConfig)
-    //    println("rime: config $newConfig")
     //}
 
     override fun onStartInput(info: EditorInfo?, restarting: Boolean) {
@@ -301,7 +297,7 @@ class MyInputMethodService : InputMethodService(),
 
         val inputManager: InputManager = getSystemService(INPUT_SERVICE) as InputManager
 
-        Log.d(TAG, "onStartInputView: ${inputManager.inputDeviceIds.contentToString()}")
+        if (DEBUG) Log.d(TAG, "onStartInputView: ${inputManager.inputDeviceIds.contentToString()}")
 
         if (lifecycleRegistry.currentState != Lifecycle.State.RESUMED) {
             lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_START)
@@ -315,16 +311,9 @@ class MyInputMethodService : InputMethodService(),
                 KeyboardPreferencesManager.getOptionsFromSession(session)
             }
             uiState = uiState.copy(
-                keyboardMode = KeyboardMode.QWERTY,
                 imeOptions = info?.imeOptions ?: EditorInfo.IME_ACTION_UNSPECIFIED,
-                composingText = "",
-                candidates = emptyObjectList(),
                 languageLabel = langTag,
                 options = options,
-                isCandidatesExpanded = false,
-                isMenuOpen = false,
-                isEmojiOpen = false,
-                isTextEditOpen = false
             )
         }
     }
@@ -333,7 +322,7 @@ class MyInputMethodService : InputMethodService(),
         super.onFinishInputView(finishingInput)
         commitOrClearComposing()
 
-        Log.d(TAG, "onFinishInputView: " + resources.configuration.hardKeyboardHidden)
+        if (DEBUG) Log.d(TAG, "onFinishInputView: " + resources.configuration.hardKeyboardHidden)
 
         if (lifecycleRegistry.currentState.isAtLeast(Lifecycle.State.STARTED)) {
             lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
@@ -364,32 +353,33 @@ class MyInputMethodService : InputMethodService(),
         }
     }
 
-    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        Log.d(TAG, "onKeyDown: ${event?.isSystem}")
-        if (event?.isSystem == false) {
-            currentInputConnection?.requestCursorUpdates(
-                InputConnection.CURSOR_UPDATE_MONITOR or InputConnection.CURSOR_UPDATE_IMMEDIATE
-            )
-            val x11Key = when (event.keyCode) {
-                KeyEvent.KEYCODE_DPAD_LEFT -> 0xff51
-                KeyEvent.KEYCODE_DPAD_RIGHT -> 0xff53
-                KeyEvent.KEYCODE_DPAD_UP -> 0xff52
-                KeyEvent.KEYCODE_DPAD_DOWN -> 0xff54
-                KeyEvent.KEYCODE_DEL -> 0xff08
-                KeyEvent.KEYCODE_ENTER -> 0xff0d
-                else -> {
-                    -1
-                }
-            }
-            launchWithMain {
-                val (rimeContext, commitText) = withRimeContext { rimeSession ->
+    private fun rimeKeyHandler(event: KeyEvent?): Boolean {
+        if (event == null) return false
+        if (event.isSystem) return false
 
-                    val keycode = event.unicodeChar
-                    if (rimeSession.processKey(if (x11Key > 0) x11Key else keycode, 0)) {
-                    }
-                    Pair(rimeSession.context, rimeSession.commitText)
-                }
-                Log.d(TAG, "onKeyDown: $x11Key $rimeContext")
+        val xk = RimeKeyMap.toX11Keycode(event)
+
+        if (xk == RimeKeyMap.XK_VoidSymbol) return false
+
+        if (uiState.rimeContext == null) {// 切换到硬键盘时,请求获得光标位置
+            currentInputConnection?.requestCursorUpdates(
+                InputConnection.CURSOR_UPDATE_MONITOR or
+                        InputConnection.CURSOR_UPDATE_IMMEDIATE
+            )
+        }
+
+        val modifier = RimeKeyMap.toRimeModifier(event)
+
+        launchWithMain {
+            if (DEBUG) Log.d(TAG, "onKey: $xk $event $modifier")
+            val (rimeContext, commitText, handled) = withRimeContext { rimeSession ->
+
+                val handled = rimeSession.processKey(xk, modifier)
+
+                Triple(rimeSession.context, rimeSession.commitText, handled)
+            }
+            if (handled) {
+                if (DEBUG) Log.d(TAG, "onKeyHandled: $rimeContext")
                 uiState = uiState.copy(
                     rimeContext = rimeContext,
                     composingText = "",
@@ -398,21 +388,20 @@ class MyInputMethodService : InputMethodService(),
                 if (commitText.isNotEmpty()) {
                     currentInputConnection?.commitText(commitText, 1);
                 }
+            } else {
+                currentInputConnection?.sendKeyEvent(event)
             }
-            return true
         }
-        return super.onKeyDown(keyCode, event)
+        return true
     }
 
-    //override fun onKeyLongPress(keyCode: Int, event: KeyEvent?): Boolean {
-    //    println("rime: onKeyLong $keyCode $event")
-    //    return super.onKeyLongPress(keyCode, event)
-    //}
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        return rimeKeyHandler(event) || super.onKeyDown(keyCode, event)
+    }
 
-    //override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
-    //    println("rime: onKeyUp $keyCode $event")
-    //    return super.onKeyUp(keyCode, event)
-    //}
+    override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
+        return rimeKeyHandler(event) || super.onKeyUp(keyCode, event)
+    }
 
     //override fun onUpdateSelection(
     //    oldSelStart: Int,
@@ -430,7 +419,6 @@ class MyInputMethodService : InputMethodService(),
     //        candidatesStart,
     //        candidatesEnd
     //    )
-    //    println("rime: onUpdateSelection $oldSelStart $oldSelEnd $newSelStart $newSelEnd")
     //}
 
     override fun onUpdateCursorAnchorInfo(cursorAnchorInfo: CursorAnchorInfo?) {
@@ -460,7 +448,7 @@ class MyInputMethodService : InputMethodService(),
                 val textToCommit = keyData.primaryText
                 launchWithMain {
                     val (composingText, commitText, candidates) = withRimeContext { session ->
-                        if (session.processKey(textToCommit.codePointAt(0), 0)) {
+                        if (session.processKey(textToCommit.codePointAt(0), NONE)) {
                             val candidates = rimeGetCandidates(session, 0, 10, 60)
                             RimeResult(
                                 session.composingText,
@@ -503,7 +491,7 @@ class MyInputMethodService : InputMethodService(),
             KeyType.BACKSPACE -> {
                 launchWithMain {
                     val (composingText, _, candidates, consumeKey) = withRimeContext { session ->
-                        if (session.processKey(0xff08, 0)) {
+                        if (session.processKey(RimeKeyMap.XK_BackSpace, NONE)) {
                             val candidates = rimeGetCandidates(session, 0, 10)
                             RimeResult(session.composingText, "", candidates, true)
                         } else {
@@ -534,7 +522,7 @@ class MyInputMethodService : InputMethodService(),
             KeyType.SPACE -> {
                 launchWithMain {
                     val (composingText, commitText, candidates) = withRimeContext { session ->
-                        if (session.processKey(0x20, 0)) {
+                        if (session.processKey(0x20, NONE)) {
                             val candidates = rimeGetCandidates(session, 0, 10, 60)
                             RimeResult(session.composingText, session.commitText, candidates, true)
                         } else {
@@ -559,7 +547,7 @@ class MyInputMethodService : InputMethodService(),
             KeyType.ENTER -> {
                 launchWithMain {
                     val commitText = withRimeContext { session ->
-                        if (session.processKey(0xff0d, 0)) {
+                        if (session.processKey(RimeKeyMap.XK_Return, NONE)) {
                             session.commitText
                         } else {
                             null
@@ -592,7 +580,7 @@ class MyInputMethodService : InputMethodService(),
             launchWithMain {
                 val (composingText, commitText, candidates) = withRimeContext {
                     val secondaryText = keyData.secondaryText
-                    if (it.processKey(secondaryText.codePointAt(0), 0)) {
+                    if (it.processKey(secondaryText.codePointAt(0), NONE)) {
                         val candidates = rimeGetCandidates(it, 0, 10, 60)
                         RimeResult(
                             it.composingText,
@@ -744,46 +732,50 @@ class MyInputMethodService : InputMethodService(),
 
     override fun onPageChange(backward: Boolean) {
         launchWithMain {
-            val (rimeContext, commitText) = withRimeContext { session ->
+            val rimeContext = withRimeContext { session ->
                 session.changePage(backward)
-                Pair(session.context, session.commitText)
+                session.context
             }
             uiState = uiState.copy(
                 rimeContext = rimeContext
             )
-            if (commitText.isNotEmpty()) {
-                currentInputConnection?.commitText(commitText, 1)
-            }
         }
     }
 
     override fun onCandidateSelect(canIdx: Int, pageIdx: Int) {
+        if (pageIdx != -1) { // hardKeyboard
+            launchWithMain {
+                val (commitText, rimeContext) = withRimeContext { session ->
+                    session.selectCandidateOnCurrentPage(canIdx)
+                    Pair(session.commitText, session.context)
+                }
+
+                uiState = uiState.copy(
+                    rimeContext = rimeContext
+                )
+                if (commitText.isNotEmpty()) {
+                    currentInputConnection?.commitText(commitText, 1)
+                }
+            }
+            return
+        }
         launchWithMain {
             val (composingText, commitText, candidates) = withRimeContext { session ->
 
-                if (pageIdx != -1) {
-                    session.selectCandidateOnCurrentPage(canIdx)
-                } else {
-                    session.selectCandidate(canIdx)
-                }
-
+                session.selectCandidate(canIdx)
                 val composingText = session.composingText
                 if (composingText.isNotEmpty()) {
-                    RimeResult(
-                        composingText, "", rimeGetCandidates(
-                            session, 0,
-                            if (uiState.isCandidatesExpanded) 30 else 10
-                        )
+                    val candidates = rimeGetCandidates(
+                        session, 0,
+                        if (uiState.isCandidatesExpanded) 30 else 10
                     )
+                    Triple(composingText, "", candidates)
                 } else {
-                    RimeResult("", session.commitText, mutableObjectListOf())
+                    Triple("", session.commitText, emptyObjectList())
                 }
             }
-            if (pageIdx != -1) {
-                uiState = uiState.copy(
-                    rimeContext = null
-                )
-            } else if (composingText.isNotEmpty()) {
+
+            if (composingText.isNotEmpty()) {
                 uiState = uiState.copy(
                     composingText = composingText,
                     candidates = candidates
@@ -849,11 +841,7 @@ class MyInputMethodService : InputMethodService(),
     }
 
     override fun onClearComposing() {
-        uiState = uiState.copy(
-            composingText = "",
-            candidates = emptyObjectList(),
-            isCandidatesExpanded = false
-        )
+        uiState = ImeUiState()
         currentInputConnection?.finishComposingText()
     }
 

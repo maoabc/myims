@@ -142,10 +142,7 @@ fun FloatingCandidateContent(
                     val pageSize = rimeContext.menu.page_size
                     val displayCount =
                         if (pageSize > 0) candidates.size.coerceAtMost(pageSize) else candidates.size
-                    val highlightedIndex = rimeContext.menu.highlighted_candidate_index.coerceIn(
-                        0,
-                        (displayCount - 1).coerceAtLeast(0)
-                    )
+                    val highlightedIndex = rimeContext.menu.highlighted_candidate_index
 
                     val lazyListState = rememberLazyListState()
 
@@ -189,7 +186,7 @@ fun FloatingCandidateContent(
                                     // 序号依据 select_keys，若为空则默认使用序号 1. 2. 3.
                                     val selectKeys = rimeContext.menu.select_keys
                                     val label =
-                                        if (selectKeys.isNotEmpty() && i < selectKeys.size) {
+                                        if (i < selectKeys.size) {
                                             "${selectKeys[i]}."
                                         } else {
                                             "${i + 1}."

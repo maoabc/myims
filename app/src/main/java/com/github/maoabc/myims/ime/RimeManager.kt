@@ -34,7 +34,7 @@ object RimeManager {
 
         // 实现回调相关事件处理
         RimeAPI.rimeInit(rimeDir.absolutePath, false) { _, type, value ->
-            Log.d("rime", "type: $type, value: $value ")
+            Log.i("rime", "type: $type, value: $value ")
         }
         isInitialized = true
     }

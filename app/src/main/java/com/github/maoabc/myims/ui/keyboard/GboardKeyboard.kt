@@ -51,9 +51,10 @@ fun HardOrSoftKeyboard(
     val rimeContext = uiState.rimeContext
     if (rimeContext != null) {
         if (rimeContext.composition.preedit.isNotEmpty()) {
+            val pageIdx = rimeContext.menu.page_no
             FloatingCandidateWindow(
                 rimeContext = rimeContext,
-                onCandidateClick = { actionHandler.onCandidateSelect(it.index) },
+                onCandidateClick = { actionHandler.onCandidateSelect(it.index, pageIdx) },
                 onPageChange = { actionHandler.onPageChange(it) },
                 positionProvider = positionProvider
             )
