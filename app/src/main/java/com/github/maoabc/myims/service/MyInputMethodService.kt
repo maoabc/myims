@@ -773,7 +773,7 @@ class MyInputMethodService : InputMethodService(),
                 if (composingText.isNotEmpty()) {
                     val candidates = rimeGetCandidates(
                         session, 0,
-                        if (uiState.isCandidatesExpanded) 30 else 10
+                        if (uiState.isCandidatesExpanded) 20 else 10
                     )
                     Triple(composingText, "", candidates)
                 } else {
@@ -849,6 +849,7 @@ class MyInputMethodService : InputMethodService(),
     override fun onClearComposing() {
 
         uiState = ImeUiState(
+            imeOptions = uiState.imeOptions,
             languageLabel = uiState.languageLabel,
             options = uiState.options,
         )
