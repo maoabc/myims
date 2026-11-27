@@ -4,15 +4,11 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Backspace
@@ -21,7 +17,6 @@ import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.KeyboardCapslock
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -72,6 +67,7 @@ fun KeyButton(
     val coroutineScope = rememberCoroutineScope()
     var isPressed by remember { mutableStateOf(false) }
     var isSwipingUp by remember { mutableStateOf(false) }
+    var isLongPressed by remember { mutableStateOf(false) }
     val asciiPunct = KeyboardPreferencesManager.options.asciiPunct
 
     val displayText = remember(keyData, shiftState) {
@@ -125,15 +121,16 @@ fun KeyButton(
                         val down = awaitFirstDown()
                         isPressed = true
                         isSwipingUp = false
-                        var longPressTriggered = false
+                        isLongPressed = false
 
                         val longPressJob = coroutineScope.launch {
                             delay(400.milliseconds)
                             if (!isSwipingUp) {
-                                longPressTriggered = true
-                                if (keyData.type != KeyType.BACKSPACE) {
-                                    HapticFeedbackHelper.performLongPress(haptic)
+                                HapticFeedbackHelper.performLongPress(haptic)
+                                if (keyData.type == KeyType.SHIFT) {
                                     onKeyLongPress(keyData)
+                                } else if (!keyData.secondaryText.isNullOrEmpty() && keyData.type == KeyType.CHARACTER) {
+                                    isLongPressed = true
                                 }
                             }
                         }
@@ -175,28 +172,27 @@ fun KeyButton(
                             isPressed = false
                         }
 
-                        if (!longPressTriggered) {
-                            if (keyData.type != KeyType.BACKSPACE) {
-                                HapticFeedbackHelper.performTap(haptic)
-                                if (isSwipingUp && !keyData.secondaryText.isNullOrEmpty()) {
-                                    onKeyClick(keyData.copy(primaryText = keyData.secondaryText))
-                                } else {
-                                    onKeyClick(
-                                        if (keyData.type == KeyType.CHARACTER && shiftState.isCapitalized()) {
-                                            keyData.copy(primaryText = displayText)
-                                        } else keyData
-                                    )
-                                }
+                        if (keyData.type != KeyType.BACKSPACE) {
+                            HapticFeedbackHelper.performTap(haptic)
+                            if ((isSwipingUp || isLongPressed) && !keyData.secondaryText.isNullOrEmpty()) {
+                                onKeyClick(keyData.copy(primaryText = keyData.secondaryText))
+                            } else {
+                                onKeyClick(
+                                    if (keyData.type == KeyType.CHARACTER && shiftState.isCapitalized()) {
+                                        keyData.copy(primaryText = displayText)
+                                    } else keyData
+                                )
                             }
                         }
                         isSwipingUp = false
+                        isLongPressed = false
                     }
                 }
             },
         contentAlignment = Alignment.Center
     ) {
-        // Floating swipe-up preview bubble using Popup
-        if (isSwipingUp && !keyData.secondaryText.isNullOrEmpty()) {
+        // Floating preview bubble for both swipe-up and long-press
+        if ((isSwipingUp || isLongPressed) && !keyData.secondaryText.isNullOrEmpty()) {
             Popup(
                 alignment = Alignment.TopCenter,
                 offset = IntOffset(0, -200),
